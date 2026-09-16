@@ -1,0 +1,87 @@
+name: Repository and application checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUTF8: "1"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repository:
+    name: Repository safety / Linux
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      app_present: ${{ steps.source.outputs.available }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+      - name: Inspect committed repository contents
+        run: python scripts/repo_guard.py
+      - name: Run repository regression tests
+        run: python -m unittest discover -s tests -p test_repository.py -v
+      - name: Check Python syntax
+        run: python -m compileall -q scripts tests
+      - name: Detect application source
+        id: source
+        shell: bash
+        run: |
+          if [ -f app/main.py ] && [ -f pyproject.toml ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Application source is not imported; application tests were not run."
+          fi
+
+  repository_windows:
+    name: Repository safety / Windows
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+      - run: python scripts/repo_guard.py
+      - run: python -m unittest discover -s tests -p test_repository.py -v
+
+  application:
+    name: Application tests / ${{ matrix.os }}
+    needs: repository
+    if: needs.repository.outputs.app_present == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+      - name: Install application test dependencies
+        run: python -m pip install -r requirements-dev.txt
+      - name: Full discovered test suite; skips are failures
+        run: python scripts/run_tests.py
+      - name: Check application Python syntax
+        run: python -m compileall -q app scripts tests
+      - name: Check browser JavaScript syntax
+        run: node --check dist/assets/app.js
