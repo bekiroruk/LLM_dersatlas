@@ -11,7 +11,7 @@ from urllib.parse import urlsplit
 from fastapi import FastAPI, Depends, HTTPException, Request, Response, UploadFile, File
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import select, delete
 from sqlalchemy.exc import IntegrityError
 from starlette.middleware.trustedhost import TrustedHostMiddleware
@@ -21,6 +21,7 @@ from .security import hash_password, check_password, token_hash, require_subject
 from .providers import Ollama, VectorStore, ModelUnavailable
 from .worker import IngestWorker
 from .rag import RAGService
+from .conversation import HistoryTurn, MAX_HISTORY_TURNS, MAX_HISTORY_CHARS, history_size
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -65,9 +66,18 @@ class SubjectBody(BaseModel):
 
 
 class QuestionBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     subject_id: str | None = Field(default=None, min_length=36, max_length=36)
     question: str = Field(min_length=3, max_length=1200)
     mode: Literal["rag", "agent"] = "rag"
+    history: list[HistoryTurn] = Field(default_factory=list, max_length=MAX_HISTORY_TURNS)
+
+    @model_validator(mode="after")
+    def bounded_history(self):
+        if history_size(self.history) > MAX_HISTORY_CHARS:
+            raise ValueError("Sohbet bağlamı toplam 6000 karakteri aşamaz.")
+        return self
 
 
 class FeedbackBody(BaseModel):
@@ -289,7 +299,7 @@ def create_app(settings=None, model=None, vectors=None):
             raise HTTPException(429, "Model başka bir soruyu işliyor; tamamlanınca tekrar dene.")
         start, result = time.perf_counter(), None
         try:
-            result = app.state.rag.answer(db, user, body.subject_id, body.question.strip(), body.mode)
+            result = app.state.rag.answer(db, user, body.subject_id, body.question.strip(), body.mode, history=body.history)
             return_result = result
         except ModelUnavailable as exc:
             raise HTTPException(503, str(exc)) from exc

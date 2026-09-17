@@ -41,6 +41,8 @@ const subjects = [
 ];
 const requests = [];
 let availableSubjects = subjects;
+let questionAnswer = 'Uydurma UI test cevabı. [K1]';
+let questionError = false, holdQuestion = false, releaseQuestion;
 const user = { id: 'user-a', username: 'Test', role: 'admin' };
 const context = vm.createContext({
   document: { getElementById: id => elements.get(id) || null, createElement: tag => new Element(tag), querySelectorAll: () => [] },
@@ -55,8 +57,12 @@ const context = vm.createContext({
     else if (url === '/api/dashboard') data = { ready: 3, chunks: 3, query_count: 0, insufficient: 0, p50_ms: null, p95_ms: null, positive_feedback: 0, errors: 0 };
     else if (url === '/api/questions') {
       const body = JSON.parse(options.body); requests.push(body);
+      if (questionError) return { ok: false, status: 503, json: async () => ({ detail: 'Test modeli kapalı' }) };
+      if (holdQuestion) await new Promise(resolve => { releaseQuestion = resolve; });
       const subject = subjects.find(s => s.id === body.subject_id) || subjects[1];
-      data = { answer: 'Uydurma UI test cevabı. [K1]', outcome: 'answered', elapsed_ms: 25, query_id: 'test-id',
+      data = { answer: questionAnswer, outcome: 'answered', elapsed_ms: 25, query_id: 'test-id',
+        context_used: body.history.length > 0 && body.question.startsWith('Peki'),
+        resolved_question: body.question.startsWith('Peki') ? 'Karadeniz ve Akdeniz iklimlerinin bitki örtüsü nasıl farklıdır?' : body.question,
         trace: [{ tool: 'search_notes', query: body.question, found: 1 }],
         sources: [{ source_id: 'K1', subject_id: subject.id, subject_name: subject.name, filename: 'Test.pdf', location: 'PDF sayfa 1', text: '<img src=x onerror=neverExecute()>', document_id: 'doc-id' }] };
     } else data = { ok: true };
@@ -80,6 +86,7 @@ async function main() {
   check('Genel RAG isteği ders id yerine null gönderir', () => {
     assert.equal(requests[0].subject_id, null);
     assert.equal(requests[0].mode, 'rag');
+    assert.equal(requests[0].history.length, 0);
   });
   check('Kaynak kartında ders, dosya, sayfa ve güvenli düz metin bulunur', () => {
     const text = get('sources').textContent;
@@ -102,6 +109,7 @@ async function main() {
   check('İsteğe bağlı filtre yalnızca açıkça seçilen ders id değerini gönderir', () => {
     assert.equal(requests[1].subject_id, subjects[0].id);
     assert.ok(get('page-title').textContent.includes('Tarih'));
+    assert.equal(requests[1].history.length, 0);
   });
   get('search-subject-select').value = '';
   get('search-subject-select').events.change();
@@ -112,15 +120,70 @@ async function main() {
   check('Araştırma ajanı genel kapsamla gönderilir; adımlar ve güvenli araç açıklaması görünür', () => {
     assert.equal(requests[2].subject_id, null);
     assert.equal(requests[2].mode, 'agent');
+    assert.equal(requests[2].history.length, 0);
     assert.ok(get('messages').textContent.includes('Arama ve doğrulama adımlarını göster'));
     assert.ok(get('method-hint').textContent.includes('komut çalıştıramaz'));
     assert.equal(get('search-subject-select').disabled, false);
+  });
+  get('question').value = 'Peki bu iki iklimin bitki örtüsü nasıl farklı?';
+  await context.submitQuestion();
+  check('Takip sorusu aynı kapsamın önceki mesajını gönderir; eski kaynak/atıf taşımaz', () => {
+    const history = requests[3].history;
+    assert.equal(history.length, 1);
+    assert.equal(history[0].question, 'Notlarıma göre karşılaştırma yap.');
+    assert.equal(history[0].subject_id, null);
+    assert.ok(!history[0].answer.includes('[K1]'));
+    assert.equal(history[0].sources, undefined);
+    assert.ok(get('messages').textContent.includes('Bağlamla anlaşılan soru: Karadeniz ve Akdeniz'));
+  });
+  get('mode').value = 'rag'; get('mode').events.change();
+  get('question').value = 'Bunu kısalt.';
+  await context.submitQuestion();
+  check('RAG/ajan geçişi hafızayı korur; takip zincirinde açık soru taşınır', () => {
+    assert.equal(requests[4].mode, 'rag');
+    assert.equal(requests[4].history.length, 2);
+    assert.equal(requests[4].history[1].resolved_question, 'Karadeniz ve Akdeniz iklimlerinin bitki örtüsü nasıl farklıdır?');
+  });
+  questionAnswer = 'Uzun cevap '.repeat(300);
+  for (let index = 0; index < 7; index++) {
+    get('question').value = 'Uzun soru ' + index + ' ' + 'x'.repeat(1000);
+    await context.submitQuestion();
+  }
+  check('Hafıza en fazla 4 tur / 6000 karakter; cevaplar en fazla 1200 karakter', () => {
+    for (const request of requests) {
+      assert.ok(request.history.length <= 4);
+      assert.ok(request.history.reduce((n, t) => n + t.question.length + t.resolved_question.length + t.answer.length, 0) <= 6000);
+      for (const turn of request.history) assert.ok(turn.answer.length <= 1200);
+    }
+  });
+  questionAnswer = 'Uydurma UI test cevabı. [K1]';
+  context.clearChat();
+  check('Temizle sohbeti, kaynakları ve takip sorusu hafızasını sıfırlar', () => {
+    assert.ok(get('memory-hint').textContent.includes('0 önceki soru'));
+    assert.equal(get('source-count').textContent, '0');
+  });
+  questionError = true; get('question').value = 'Başarısız yeni soru';
+  await context.submitQuestion(); questionError = false;
+  get('question').value = 'Tekrar başarılı soru';
+  await context.submitQuestion();
+  check('HTTP hatası hafızaya kaydedilmez; Temizle sonrası eski bağlam gönderilmez', () => {
+    assert.equal(requests.at(-1).history.length, 0);
+  });
+  holdQuestion = true; get('question').value = 'Geciken soru';
+  const pending = context.submitQuestion();
+  await new Promise(setImmediate);
+  context.clearChat(); releaseQuestion(); await pending; holdQuestion = false;
+  check('Temizlenen sohbetin gecikmiş cevabı hafızayı veya kaynakları geri getirmez', () => {
+    assert.ok(get('memory-hint').textContent.includes('0 önceki soru'));
+    assert.equal(get('source-count').textContent, '0');
+    assert.ok(!get('messages').textContent.includes('Uydurma UI test cevabı'));
   });
   context.showLogin();
   check('Çıkışta önceki kaynaklar, sohbet ve filtre temizlenir', () => {
     assert.equal(get('source-count').textContent, '0');
     assert.ok(!get('messages').textContent.includes('Uydurma UI test cevabı'));
     assert.equal(get('send').disabled, true);
+    assert.ok(get('memory-hint').textContent.includes('0 önceki soru'));
   });
   availableSubjects = [];
   await context.loadApp({ id: 'user-b', username: 'Yeni', role: 'student' });

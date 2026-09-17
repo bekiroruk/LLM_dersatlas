@@ -4,6 +4,14 @@ Yalnızca gerçekten yapılan değişiklikler kaydedilir. Planlanan özellikler 
 
 ## Unreleased
 
+### Oturum içi sohbet bağlamı — 2026-09-17
+
+- Son en fazla 4 tur / 6000 karakter yalnızca açık sayfanın RAM'inde tutulur; kalıcı sohbet tablosu, localStorage veya yeni bağımlılık yok.
+- Yerel model takip sorusunu bağımsız arama sorusuna çevirir; RAG/ajan güncel yetkilerle yeniden kaynak arar. Önceki cevap ve atıflar kanıt olarak aktarılmaz.
+- Yeni konu kendi sorusuyla aranır; belirsiz/geçersiz bağlam çıktısında açıklama istenir. Kullanıcının sayıları değiştiren veya yeni yıl uyduran yeniden yazım reddedilir.
+- Temizle, çıkış, sayfa yenileme ve ders filtresi değişimi hafızayı sıfırlar. Gecikmiş cevap temizlenmiş sohbeti geri getiremez.
+- 113 Python ve 14 JavaScript mantık testi yerel Linux ortamında başarılı; model test çiftidir. Gerçek Ollama takip sorusu denemesi ayrıca yapılmalı.
+
 ### Genel Sohbet ve araştırma ajanı — 2026-09-17
 
 - İsteğe bağlı subject_id: varsayılan tüm yetkili derslerde hibrit arama.
@@ -35,9 +43,5 @@ Yalnızca gerçekten yapılan değişiklikler kaydedilir. Planlanan özellikler 
 - Coğrafya kapsamında dağların kıyıya paralel uzanması sorusunun cevaplanması.
 
 Bu üç sonuç kullanıcı tarafından yerel uygulamada bildirildi; kapsamlı bir RAG doğruluk ölçümü değildir. Güncel uygulama kodu ilk aktarım commit'iyle repoya eklendi.
-
-### Pending
-
-- Takip soruları için sınırlı sohbet bağlamı.
 
 Henüz yeni sürüm etiketi veya release oluşturulmadı.

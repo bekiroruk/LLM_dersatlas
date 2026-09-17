@@ -35,6 +35,7 @@ Uygulama kökünde şu eşleştirme kullanılır:
 | app/main.py | API sözleşmesi, oturum, erişim ve sorgu ölçümleri |
 | app/providers.py | Ollama istemcisi ve Qdrant işlemleri |
 | app/rag.py | Soru normalizasyonu, arama, kaynak uygunluğu ve cevap doğrulama |
+| app/conversation.py | Sınırlı istek bağlamı ve takip sorusunu bağımsız soruya çevirme; kanıt değildir |
 | app/db.py | SQL modelleri ve veritabanı bağlantısı |
 | app/migrations.py | Eski SQLite sorgu ölçümlerinin veriyi koruyan şema geçişi |
 | app/security.py | Yetkili dersler ve erişim kontrolü |
@@ -77,7 +78,7 @@ Doküman yükleme ekranındaki ders seçimi ile sohbetin arama kapsamı ayrıdı
 - API, istemcinin gönderdiği ders listesini güvenilir kabul etmez; erişim kapsamını sunucuda hesaplar.
 - Kaynak kartı ders adı, dosya adı ve fiziksel PDF sayfasını içerir.
 - Genel sorgular QueryMetric.subject_id=null ile kaydedilir; SQLite başlangıcında eski tablo yedek alındıktan sonra idempotent biçimde geçirilir.
-- Sohbet bağlamı sonraki aşamadır; yeni sorular için yeniden yetkili arama ve kanıt kontrolü yapılır.
+- Sohbet bağlamı yalnızca göndermeleri çözer; her cevap için yeniden yetkili arama ve kanıt kontrolü yapılır.
 
 Global arama için Qdrant filtresini tamamen kaldırmak yeterli ve güvenli bir çözüm değildir.
 
@@ -87,6 +88,8 @@ Araştırma ajanının tek aracı search_notes(query)'dir. Varsayılan en fazla 
 
 Kalıcı veri: kullanıcılar, yetkiler, dersler, dokümanlar, parçalar, indeksler ve sorgu ölçümleri.
 
-Mevcut arayüzdeki konuşma metinleri kalıcı sunucu sohbet geçmişi olarak tutulmaz. Hedef sohbet bağlamı için uzunluk, oturum ayrımı, temizleme ve saklama politikası ayrıca belirlenecek.
+Konuşma bağlamı yalnızca açık sayfanın RAM'inde, en fazla 4 tur / 6000 karakter olarak tutulur. İstekte güvenilmeyen veri olarak yerel modele gönderilir; sorgu/cevap üretimi bittikten sonra uygulama bunu kalıcı geçmişe kaydetmez. Temizle, çıkış, yenileme ve arama kapsamı değişimi bağlamı sıfırlar. Sunucuda paylaşılan hafıza, localStorage/sessionStorage veya sohbet tablosu yoktur.
+
+Bağlam çözümleyicisi yalnızca referansları açan bir soru üretir; araç kullanamaz. Önceki cevap cevaplayıcıya kanıt olarak aktarılmaz. Yeni konuda özgün soru korunur; belirsiz/bozuk yeniden yazımda kullanıcıdan konu adı istenir. Yeni arama aynı SQL/Qdrant yetkileriyle çalışır; eski etiketler yeni kaynaklara bağlanmaz. Tarih/sayı değiştiren yeniden yazım reddedilir; bu kontrol genel bir anlamsal doğruluk garantisi değildir.
 
 Gömülü Qdrant veri dizini tek süreç tarafından açılır. Sunucuyu tekrar başlatmadan önce mevcut Uvicorn süreci durdurulur; kilit dosyaları veya veri dizini silinmez.

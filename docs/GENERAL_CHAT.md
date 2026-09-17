@@ -44,7 +44,30 @@ Bir kontrol başarısızsa sonraki komutu çalıştırma. Ardından mevcut uygul
 | Araştırma ajanı · çok adımlı | Alt sorularla ek aramalar; aynı yetkili kapsam, ardından kaynaklı cevap |
 | Kaynak defteri | Ders adı, dosya adı, PDF fiziksel sayfası/metin konumu ve kaynak bölümü |
 
-Ders filtresi değişince önceki mesajlar silinmez; her mesaj gönderildiği kapsamı gösterir. Her yeni soru şimdilik bağımsızdır: “bunu kısalt” gibi önceki cevaba gönderme yapan takip soruları henüz desteklenmez.
+Ders filtresi değişince görünen mesajlar silinmez; her mesaj gönderildiği kapsamı gösterir. Ancak takip sorusu hafızası sıfırlanır: önceki kapsamdan bir konunun yeni derse taşınması engellenir. Doküman yönetimindeki sol ders seçimi ve RAG/ajan yöntemi değişimi hafızayı sıfırlamaz.
+
+## Sohbet hafızası
+
+Son en fazla 4 tamamlanmış soru/cevap turu, toplam 6000 karakter sınırıyla yalnızca açık sayfanın RAM'inde tutulur. Uzun cevapların en fazla ilk 1200 karakteri bağlama alınır; eski kaynak etiketleri kaldırılır. En eski turlar önce çıkarılır. Görünen sohbet daha uzun olabilir; tamamı modele gönderilmez.
+
+Temizle, çıkış, sayfa yenileme veya arama filtresi değişimi hafızayı sıfırlar. localStorage/sessionStorage, kalıcı sohbet tablosu ve hesaplar arasında paylaşılan geçmiş yoktur. Sunucu gelen bağlamı yalnızca istek sırasında yerel Ollama ile işler; konuşma veritabanına kaydedilmez. Sorgu ölçümleri yine yalnızca süre/sonuç/geri bildirim metadatasını tutar.
+
+Takip sorusunda yerel model önce konuyu açıkça belirten bir arama sorusu üretir. “Bağlamla anlaşılan soru” arayüzde görünür. Önceki model cevabı yalnızca göndermeleri çözmeye yardımcı olur; gerçek bilgi sayılmaz ve cevap üreten modele kaynak olarak verilmez. Yeni cevap için belgelerde tekrar yetkili arama yapılır ve mevcut kaynak kontrolleri uygulanır. Konu çözülemezse açıklama istenir; eski atıflar yeni cevaba yapıştırılmaz.
+
+Yeni ve açık bir soruda eski konu eklenmez. Gönderme çözümü için geçmiş varsa bir ek yerel model çağrısı yapılabilir; ilk soruda bu çağrı yoktur. Takip sorusu gecikmesi gerçek donanımla ayrıca ölçülmelidir.
+
+API'de history isteğe bağlıdır: en fazla dört question/answer/resolved_question/subject_id nesnesi kabul edilir. Rol, kaynak veya kullanıcı kimliği alanları kabul edilmez. Metin/karakter sınırı ihlalinde 422 döner. Sunucu yalnızca mevcut arama kapsamıyla eşleşen ardışık son turları kullanır; history yetki veya kaynak kapsamını değiştiremez. /api/questions takip sorularını çözer; /api/search bağımsız arama uç noktasıdır.
+
+### Peş peşe kabul denemeleri
+
+Tüm dersler veya Coğrafya filtresiyle aynı sayfada sırayla sor:
+
+1. Karadeniz ve Akdeniz iklimini karşılaştır.
+2. Peki bu iki iklimin bitki örtüsü nasıl farklı?
+3. Bunu kısalt.
+4. İstanbul hangi tarihte ve hangi padişah döneminde fethedildi?
+
+İkinci soruda Karadeniz/Akdeniz adlarıyla açık soru ve bitki örtüsünü destekleyen yeni kaynaklar beklenir. Üçüncü soruda aynı konu kısa anlatılır, belgeler yeniden aranır. Dördüncü soruya iklim konusu eklenmez. Ayrıca Temizle sonrası “bu iki iklim” önceki sohbeti hatırlamamalıdır. Kaynakta istenen bilgi yoksa hafıza bu eksikliği doldurmaz; bilgi/örnek uydurmaması gerekir.
 
 Ajanın tek aracı search_notes(query). Varsayılan 3 tur ve tur başına 2 arama sınırı var. Komut, SQL, internet araması, dosya yazma veya silme aracı yok. Geçersiz araç/kapsam parametresi reddedilir. Ajan ek sorgular nedeniyle RAG'den daha yavaş olabilir; kesin doğru cevap garantisi değildir.
 
@@ -79,7 +102,7 @@ Yeni DB şeması nullable alanla oluşturulur. Eski SQL Server şemasında otoma
 
 ## Doğrulama sınırı
 
-Yerel Linux ortamında 92 Python testi ve 8 JavaScript arayüz mantığı testi başarılı. API/depolama testlerinde gerçek SQLite ve gömülü Qdrant, modelde test çifti kullanılır. Arayüz testleri DOM test çiftidir; gerçek görsel tarayıcı testi değildir. Güncel Linux/Windows otomatik test sonuçları GitHub Actions'ta ayrıca görülür. Gerçek Ollama ve senin PDF'lerinle bu tablodaki denemeler hâlâ gereklidir.
+Sohbet bağlamı eklenirken yerel Linux ortamında 113 Python testi ve 14 JavaScript arayüz mantığı testi başarılı. API/depolama testlerinde gerçek SQLite ve gömülü Qdrant, modelde test çifti kullanılır. Arayüz testleri DOM test çiftidir; gerçek görsel tarayıcı testi değildir. Güncel Linux/Windows otomatik test sonuçları GitHub Actions'ta ayrıca görülür. İlk beş Genel Sohbet senaryosunun başarılı olduğu kullanıcı tarafından bildirildi; yeni takip soruları gerçek Ollama ve senin PDF'lerinle ayrıca denenmelidir.
 
 Uygulamada değişiklik yaptıktan sonra gün sonu paylaşımı için [geliştirme rehberi](DEVELOPMENT.md) kullanılır.
 

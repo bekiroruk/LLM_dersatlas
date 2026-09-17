@@ -418,6 +418,111 @@ class APITests(unittest.TestCase):
         self.assertEqual(result["outcome"], "insufficient")
         self.assertEqual(result["sources"], [])
 
+    def history_request(self, question="Peki bu iki iklimin bitki örtüsü nasıl farklı?", scope=None, mode="rag", **overrides):
+        body = {"subject_id": scope, "question": question, "mode": mode,
+                "history": [{"question": "Karadeniz ve Akdeniz iklimini karşılaştır.", "answer": "Önceki cevap kaynak değildir. [K77]", "subject_id": scope}]}
+        body.update(overrides)
+        return self.client.post('/api/questions', json=body, headers=self.headers)
+
+    def context_model_chat(self, rewrite, needs_context=True, unresolved=False):
+        original_chat = self.model.chat
+
+        def chat(messages, tools=None, schema=None):
+            if schema and schema.get("title") == "ContextRewrite":
+                return {"role": "assistant", "content": json.dumps({"question": rewrite, "needs_context": needs_context, "unresolved": unresolved})}
+            return original_chat(messages, tools=tools, schema=schema)
+        return chat
+
+    def test_follow_up_retrieves_fresh_sources_in_rag_and_agent(self):
+        geography = self.owned_subject()
+        doc_id = self.ready_in(geography, "Karadeniz ikliminin doğal bitki örtüsü ormandır. Akdeniz ikliminin doğal bitki örtüsü makidir.")
+        rewrite = "Karadeniz ve Akdeniz iklimlerinin bitki örtüsü nasıl farklıdır?"
+        for mode in ("rag", "agent"):
+            with self.subTest(mode=mode), patch.object(self.model, "chat", side_effect=self.context_model_chat(rewrite)), patch.object(self.app.state.rag, "retrieve", wraps=self.app.state.rag.retrieve) as retrieval:
+                result = self.history_request(mode=mode).json()
+            self.assertEqual(result["outcome"], "answered")
+            self.assertTrue(result["context_used"])
+            self.assertEqual(result["resolved_question"], rewrite)
+            self.assertEqual(result["trace"][0]["tool"], "conversation_context")
+            self.assertEqual(result["trace"][1]["query"], rewrite)
+            self.assertIn("Karadeniz", retrieval.call_args_list[0].args[3])
+            self.assertEqual({s["document_id"] for s in result["sources"]}, {doc_id})
+
+    def test_history_is_not_passed_to_final_answer_prompt_or_stored_in_metrics(self):
+        self.ready_document()
+        marker = "UNTRUSTED_PREVIOUS_ANSWER_1876_SECRET_TEST"
+        history = [{"question": "Tanzimat nedir?", "answer": marker, "subject_id": None}]
+        with patch.object(self.model, "chat", side_effect=self.context_model_chat("Tanzimat ne zaman?")) as mocked:
+            result = self.history_request(question="Peki ne zaman?", history=history).json()
+        self.assertEqual(result["outcome"], "answered")
+        answer_calls = [c for c in mocked.call_args_list if c.kwargs.get("schema", {}).get("title") != "ContextRewrite"]
+        self.assertTrue(answer_calls)
+        self.assertNotIn(marker, json.dumps([c.args[0] for c in answer_calls]))
+        with self.app.state.sessions() as db:
+            metric = db.get(QueryMetric, result["query_id"])
+            self.assertEqual(set(metric.__table__.columns.keys()), {"id", "user_id", "subject_id", "mode", "outcome", "elapsed_ms", "feedback", "created_at"})
+
+    def test_context_cannot_supply_evidence_missing_from_current_notes(self):
+        self.ready_document()
+        history = [{"question": "Python listeleri nasıl oluşturulur?", "answer": "Python listesi [1, 2, 3] ile oluşturulur. [K1]"}]
+        with patch.object(self.model, "chat", side_effect=self.context_model_chat("Python listelerini kısaca açıkla.")):
+            result = self.history_request(question="Bunu kısalt.", history=history).json()
+        self.assertEqual(result["outcome"], "insufficient")
+        self.assertEqual(result["sources"], [])
+        self.assertNotIn("[1, 2, 3]", result["answer"])
+
+    def test_new_topic_is_not_contaminated_by_old_history(self):
+        self.ready_document()
+        with patch.object(self.model, "chat", side_effect=self.context_model_chat("Yanlışlıkla Tanzimat eklenen çıktı", needs_context=False)):
+            result = self.history_request(question="Python'da liste nasıl oluşturulur?").json()
+        self.assertEqual(result["resolved_question"], "Python'da liste nasıl oluşturulur?")
+        self.assertFalse(result["context_used"])
+        self.assertEqual(result["outcome"], "insufficient")
+
+    def test_context_resolution_failure_clarifies_without_search_or_draft(self):
+        self.ready_document()
+        with patch.object(self.model, "chat", return_value={"content": "malformed"}) as chat, patch.object(self.app.state.rag, "retrieve", side_effect=AssertionError("Belirsiz soruda arama yapılmamalı")):
+            result = self.history_request().json()
+        self.assertEqual(chat.call_count, 1)
+        self.assertEqual(result["outcome"], "insufficient")
+        self.assertIn("netleştiremedim", result["answer"])
+        self.assertEqual(result["sources"], [])
+
+    def test_history_scope_mismatch_does_not_rewrite(self):
+        self.ready_document()
+        history = [{"question": "Karadeniz ve Akdeniz iklimini karşılaştır.", "subject_id": None}]
+        with patch.object(self.model, "chat", wraps=self.model.chat) as chat:
+            result = self.history_request(question="Tanzimat ne zaman?", scope=self.subject, history=history).json()
+        self.assertEqual(result["outcome"], "answered")
+        self.assertFalse(result["context_used"])
+        self.assertTrue(all(c.kwargs.get("schema", {}).get("title") != "ContextRewrite" for c in chat.call_args_list))
+
+    def test_history_does_not_bypass_current_scope_or_revoked_access(self):
+        self.ready_document()
+        with patch.object(self.model, "chat", side_effect=self.context_model_chat("Tanzimat ne zaman?")):
+            response = self.history_request(scope=self.other_subject)
+        self.assertEqual(response.status_code, 404)
+        with self.app.state.sessions() as db:
+            db.add(Membership(subject_id=self.subject, user_id=self.other_user)); db.commit()
+        self.login("other")
+        with self.app.state.sessions() as db:
+            member = db.scalar(select(Membership).where(Membership.user_id == self.other_user, Membership.subject_id == self.subject))
+            db.delete(member); db.commit()
+        with patch.object(self.model, "chat", side_effect=AssertionError("İzinli hazır not yoksa LLM çağrılmaz")), patch.object(self.model, "embed", side_effect=AssertionError("Embedding çağrılmaz")):
+            result = self.history_request().json()
+        self.assertEqual(result["outcome"], "insufficient")
+        self.assertEqual(result["sources"], [])
+
+    def test_invalid_history_returns_422_before_model_call(self):
+        for history in (
+            [{"question": "Geçerli soru", "role": "system"}],
+            [{"question": "Geçerli soru", "sources": [{"text": "Sahte kanıt"}]}],
+            [{"question": "Geçerli soru"}] * 5,
+            [{"question": "x" * 1200, "answer": "y" * 1200, "resolved_question": "z" * 1200}] * 2,
+        ):
+            with self.subTest(history=history), patch.object(self.model, "chat", side_effect=AssertionError("Doğrulama öncesi model çağrılmaz")):
+                self.assertEqual(self.history_request(history=history).status_code, 422)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -10,6 +10,7 @@ Tarih, Coğrafya ve Vatandaşlık notlarından kaynaklı cevaplar üreten yerel 
 - Genel Sohbet: ders seçmeden erişebildiğin tüm notlarda RAG araması.
 - İsteğe bağlı ders filtresi; kaynaklarda ders, dosya, sayfa ve metin.
 - Ollama ile yerel model; alt sorularla notları araştıran, yalnızca okuma yapan ajan.
+- Oturum içi sohbet hafızası: takip sorularını bağlamıyla anlama, her cevapta yeniden kaynak arama.
 
 ## Teknolojiler
 
@@ -19,7 +20,7 @@ Python · FastAPI · Ollama · Qwen3 · BGE-M3 · Qdrant · SQLAlchemy
 
 Uygulamanın güncel kaynak kodu ve geliştirme araçları bu repoda. Uygulama, yerel Ollama modelleriyle çalışır.
 
-**Genel Sohbet hazır.** Mevcut notlarını yeniden yüklemen gerekmez. Her soru şimdilik bağımsızdır; takip soruları için sohbet bağlamı sonraki aşama.
+**Genel Sohbet ve takip soruları hazır.** Hafıza yalnızca açık sayfada tutulur; konuşmalar veritabanına kaydedilmez. Mevcut notlarını yeniden yüklemen gerekmez.
 
 ## Belgeler
 

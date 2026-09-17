@@ -1,7 +1,8 @@
 'use strict';
 const $ = (id) => document.getElementById(id);
 // subject doküman düzenlemesini, searchSubject sohbetin isteğe bağlı filtresini yönetir.
-const state = { user: null, subjects: [], subject: null, searchSubject: null, documents: [], view: 'study', busy: false, deleteId: null, timer: null };
+const state = { user: null, subjects: [], subject: null, searchSubject: null, documents: [], view: 'study', busy: false, deleteId: null, timer: null, history: [], chatEpoch: 0 };
+const MAX_HISTORY_TURNS = 4, MAX_HISTORY_CHARS = 6000;
 const labels = { queued: 'Sırada', processing: 'İşleniyor', ready: 'Hazır', error: 'Hata', deleting: 'Siliniyor', delete_error: 'Silme hatası' };
 function node(tag, text, className) { const element = document.createElement(tag); if (text !== undefined) element.textContent = text; if (className) element.className = className; return element; }
 function toast(message, error = false) { const box = $('toast'); box.textContent = message; box.className = 'toast' + (error ? ' error' : ''); box.hidden = false; clearTimeout(state.timer); state.timer = setTimeout(() => { box.hidden = true; }, 6500); }
@@ -26,6 +27,19 @@ async function api(path, options = {}) {
 function currentSubject() { return state.subjects.find(s => s.id === state.subject); }
 function searchSubject() { return state.subjects.find(s => s.id === state.searchSubject); }
 function scopeName() { return searchSubject()?.name || 'Tüm dersler'; }
+function resetConversation() { state.history = []; state.chatEpoch++; }
+function historySize(turns) { return turns.reduce((sum, turn) => sum + turn.question.length + (turn.resolved_question || '').length + turn.answer.length, 0); }
+function rememberTurn(question, result, subjectId) {
+  const answer = result.outcome === 'answered'
+    ? result.answer.replace(/\[\s*K\d+(?:\s*[,;]\s*K?\d+)*\s*\]/gi, '').trim().slice(0, 1200) : '';
+  state.history.push({ question, answer, resolved_question: (result.resolved_question || question).slice(0, 1200), subject_id: subjectId });
+  while (state.history.length > MAX_HISTORY_TURNS || historySize(state.history) > MAX_HISTORY_CHARS) state.history.shift();
+}
+function setSearchSubject(subjectId) {
+  if (state.searchSubject !== subjectId) resetConversation();
+  state.searchSubject = subjectId;
+  updateChatScope();
+}
 function updateChatScope() {
   $('scope-hint').textContent = state.searchSubject
     ? 'Yalnızca ' + scopeName() + ' dersinin erişilebilir, hazır notları aranır.'
@@ -34,8 +48,9 @@ function updateChatScope() {
     ? 'Ajan alt sorularla ek aramalar yapar. Yalnızca notları okuyabilir; komut çalıştıramaz veya dosya değiştiremez.'
     : 'RAG ilgili notları bulur ve yerel modelle kaynaklı cevap hazırlar.';
   $('send').disabled = state.busy || !state.user || !state.subjects.length;
+  $('memory-hint').textContent = 'Sohbet hafızası açık · ' + state.history.length + ' önceki soru (en fazla 4 / 6000 karakter). Temizle, filtre değişimi, çıkış veya sayfa yenileme hafızayı sıfırlar. Konuşma yalnızca açık sayfada tutulur; yerel sunucuda işlenir, veritabanına kaydedilmez.';
   if ($('welcome-text')) $('welcome-text').textContent = state.subjects.length
-    ? 'Tarih, Coğrafya veya Vatandaşlık: dersi seçmeden sor. İstersen Arama kapsamı filtresini kullan. Her soru bağımsızdır.'
+    ? 'Tarih, Coğrafya veya Vatandaşlık: dersi seçmeden sor. Aynı kapsamda takip soruları sorabilirsin. Her cevap için notlar yeniden aranır.'
     : 'Önce bir ders oluşturup Dokümanlar bölümünden notlarını ekle.';
   if (state.view === 'study') $('page-title').textContent = state.searchSubject ? scopeName() + ' · Sohbet' : 'Genel Sohbet';
 }
@@ -76,7 +91,7 @@ async function loadSubjects(preferred) {
   if (!state.subjects.length) $('subject-select').append(node('option', 'Henüz ders yok'));
   for (const subject of state.subjects) { const option = node('option', subject.name); option.value = subject.id; $('subject-select').append(option); }
   if (state.subject) $('subject-select').value = state.subject;
-  if (!state.subjects.some(s => s.id === state.searchSubject)) state.searchSubject = null;
+  if (state.searchSubject && !state.subjects.some(s => s.id === state.searchSubject)) { resetConversation(); state.searchSubject = null; }
   const all = node('option', 'Tüm dersler'); all.value = '';
   $('search-subject-select').replaceChildren(all);
   for (const subject of state.subjects) { const option = node('option', subject.name); option.value = subject.id; $('search-subject-select').append(option); }
@@ -85,6 +100,7 @@ async function loadSubjects(preferred) {
   await refreshDocuments();
 }
 function clearChat() {
+  resetConversation();
   $('messages').replaceChildren();
   const welcome = node('div', undefined, 'welcome');
   const description = node('p'); description.id = 'welcome-text';
@@ -166,14 +182,17 @@ async function submitQuestion(event) {
   event?.preventDefault(); const question = $('question').value.trim();
   if (state.busy || !state.user || !state.subjects.length || question.length < 3) return;
   const requestUserId = state.user?.id;
+  const requestChatEpoch = state.chatEpoch, requestedHistory = state.history.map(turn => ({ ...turn }));
   const requestedSubject = state.searchSubject, requestedMode = $('mode').value, requestedScopeName = scopeName();
   state.busy = true; $('send').disabled = true; $('subject-select').disabled = true; $('search-subject-select').disabled = true; $('mode').disabled = true; $('clear-chat').disabled = true; $('add-subject').disabled = true; $('question').value = '';
   $('messages').querySelector('.welcome')?.remove();
   const item = node('article', undefined, 'message'); item.append(node('div', question, 'message-user'), node('p', requestedScopeName + ' · ' + (requestedMode === 'agent' ? 'Araştırma ajanı' : 'RAG'), 'answer-scope'));
   const pending = node('p', requestedMode === 'agent' ? 'Ajan ' + requestedScopeName + ' kapsamındaki kaynakları araştırıyor…' : 'Notlar aranıyor, yerel model yanıtı hazırlıyor…', 'pending'); item.append(pending); $('messages').append(item); pending.scrollIntoView({ block: 'nearest' });
   try {
-    const result = await api('/api/questions', { method: 'POST', body: { subject_id: requestedSubject, question, mode: requestedMode } });
-    if (state.user?.id !== requestUserId) { pending.remove(); return; }
+    const result = await api('/api/questions', { method: 'POST', body: { subject_id: requestedSubject, question, mode: requestedMode, history: requestedHistory } });
+    if (state.user?.id !== requestUserId || state.chatEpoch !== requestChatEpoch) { pending.remove(); return; }
+    rememberTurn(question, result, requestedSubject);
+    if (result.context_used) item.append(node('p', 'Bağlamla anlaşılan soru: ' + result.resolved_question, 'answer-meta'));
     pending.remove(); item.append(node('div', 'DERSATLAS / KAYNAKLI ÇALIŞMA', 'answer-label'), node('div', result.answer, 'message-answer'));
     const outcomes = { answered: 'Kaynak referansları kontrol edildi', insufficient: 'Kaynak yetersiz', invalid_output: 'Çıktı biçimi doğrulanamadı', invalid_citations: 'Kaynak referansı geçersiz' };
     item.append(node('p', (outcomes[result.outcome] || result.outcome) + ' · ' + (result.elapsed_ms / 1000).toFixed(1) + ' sn', 'answer-meta'));
@@ -184,12 +203,12 @@ async function submitQuestion(event) {
     if (requestedMode === 'agent' || result.trace.length > 1) {
       const details = node('details', undefined, 'trace'); details.append(node('summary', 'Arama ve doğrulama adımlarını göster'));
       const list = node('ol');
-      const stepNames = { search_notes: 'Notlarda arama', rejected: 'İzin verilmeyen araç veya parametre reddedildi', relevance_gate: 'Kaynak ilgisi kontrolü', extractive_fallback: 'Kaynak metninden destekli alıntı' };
+      const stepNames = { conversation_context: 'Sohbet bağlamını çözümleme', search_notes: 'Notlarda arama', rejected: 'İzin verilmeyen araç veya parametre reddedildi', relevance_gate: 'Kaynak ilgisi kontrolü', extractive_fallback: 'Kaynak metninden destekli alıntı' };
       for (const step of result.trace) list.append(node('li', (stepNames[step.tool] || step.tool) + (step.query ? ': ' + step.query : '') + (step.found !== undefined ? ' · ' + step.found + ' sonuç' : '')));
       details.append(list); item.append(details);
     }
     renderSources(result.sources);
-  } catch (e) { pending.remove(); if (state.user?.id === requestUserId) { item.append(node('p', e.message, 'error')); $('question').value = question; } }
+  } catch (e) { pending.remove(); if (state.user?.id === requestUserId && state.chatEpoch === requestChatEpoch) { item.append(node('p', e.message, 'error')); $('question').value = question; } }
   finally { state.busy = false; $('subject-select').disabled = false; $('search-subject-select').disabled = false; $('mode').disabled = false; $('clear-chat').disabled = false; $('add-subject').disabled = false; updateChatScope(); if (state.user) await refreshDocuments().catch(() => {}); }
 }
 $('login-form').addEventListener('submit', async event => { event.preventDefault(); const button = event.target.querySelector('button'); button.disabled = true; $('login-error').textContent = ''; try { const user = await api('/api/login', { method: 'POST', body: { username: $('username').value.trim(), password: $('password').value } }); $('password').value = ''; await loadApp(user); } catch (e) { $('login-error').textContent = e.message; } finally { button.disabled = false; } });
@@ -197,7 +216,7 @@ $('logout').addEventListener('click', async () => { try { await api('/api/logout
 document.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => setView(button.dataset.view)));
 $('model-badge').addEventListener('click', () => setView('system'));
 $('subject-select').addEventListener('change', () => { state.subject = $('subject-select').value; setView(state.view); refreshDocuments().catch(e => toast(e.message, true)); });
-$('search-subject-select').addEventListener('change', () => { state.searchSubject = $('search-subject-select').value || null; updateChatScope(); });
+$('search-subject-select').addEventListener('change', () => setSearchSubject($('search-subject-select').value || null));
 $('mode').addEventListener('change', updateChatScope);
 $('clear-chat').addEventListener('click', clearChat);
 document.querySelectorAll('[data-question]').forEach(button => button.addEventListener('click', () => { $('question').value = button.dataset.question; $('question').focus(); }));
@@ -213,11 +232,12 @@ document.querySelectorAll('[data-close]').forEach(button => button.addEventListe
 $('subject-form').addEventListener('submit', async event => { event.preventDefault(); try { const subject = await api('/api/subjects', { method: 'POST', body: { name: $('subject-name').value.trim() } }); $('subject-dialog').close(); $('subject-name').value = ''; await loadSubjects(subject.id); toast('Yeni ders oluşturuldu; genel aramaya dahil edildi.'); } catch (e) { toast(e.message, true); } });
 $('confirm-delete').addEventListener('click', async () => { try { await api('/api/documents/' + encodeURIComponent(state.deleteId), { method: 'DELETE' }); $('delete-dialog').close(); renderSources([]); clearChat(); toast('Silme kuyruğa alındı; doküman artık arama sonuçlarına dahil edilmiyor.'); await refreshDocuments(); } catch (e) { toast(e.message, true); } });
 setInterval(() => { if (state.user && state.documents.some(d => ['queued', 'processing', 'deleting'].includes(d.status))) refreshDocuments().catch(() => {}); }, 4000);
+window.addEventListener('pagehide', resetConversation);
 // WebMCP isteğe bağlıdır; erişim kontrolleri yine Python API'de uygulanır.
 if (document.modelContext?.registerTool) {
   const lifecycle = new AbortController();
   try {
-    Promise.resolve(document.modelContext.registerTool({ name: 'select_study_subject', title: 'Sohbetin ders filtresini seç', description: 'Mevcut yetkili bir dersi sohbetin arama filtresi yapar; boş subject_id tüm derslere döner. Veri değiştirmez ve sohbeti silmez.', inputSchema: { type: 'object', properties: { subject_id: { type: 'string' } }, required: ['subject_id'], additionalProperties: false }, annotations: { readOnlyHint: false, untrustedContentHint: true }, async execute(input) { if (state.busy) throw new Error('Soru işlenirken filtre değiştirilemez.'); if (!input || typeof input.subject_id !== 'string' || (input.subject_id && !state.subjects.some(s => s.id === input.subject_id))) throw new Error('Yetkili bir ders veya tüm dersler için boş değer seç.'); state.searchSubject = input.subject_id || null; $('search-subject-select').value = state.searchSubject || ''; setView('study'); return { search_scope: scopeName(), subject_id: state.searchSubject }; } }, { signal: lifecycle.signal })).catch(() => {});
+    Promise.resolve(document.modelContext.registerTool({ name: 'select_study_subject', title: 'Sohbetin ders filtresini seç', description: 'Mevcut yetkili bir dersi sohbetin arama filtresi yapar; boş subject_id tüm derslere döner. Filtre değişimi takip sorusu hafızasını sıfırlar, görünen mesajları silmez.', inputSchema: { type: 'object', properties: { subject_id: { type: 'string' } }, required: ['subject_id'], additionalProperties: false }, annotations: { readOnlyHint: false, untrustedContentHint: true }, async execute(input) { if (state.busy) throw new Error('Soru işlenirken filtre değiştirilemez.'); if (!input || typeof input.subject_id !== 'string' || (input.subject_id && !state.subjects.some(s => s.id === input.subject_id))) throw new Error('Yetkili bir ders veya tüm dersler için boş değer seç.'); setSearchSubject(input.subject_id || null); $('search-subject-select').value = state.searchSubject || ''; setView('study'); return { search_scope: scopeName(), subject_id: state.searchSubject }; } }, { signal: lifecycle.signal })).catch(() => {});
     window.addEventListener('pagehide', () => lifecycle.abort(), { once: true });
   } catch (_) { /* Desteklenmeyen tarayıcıda normal arayüz çalışır. */ }
 }

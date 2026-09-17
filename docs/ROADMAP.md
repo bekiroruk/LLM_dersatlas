@@ -33,11 +33,11 @@ Kabul:
 
 ## 2. Sohbet bağlamı
 
-- [ ] Sınırlı sayıda tur ve toplam metin boyutu.
-- [ ] Takip sorusunu bağımsız arama sorusuna dönüştürmek.
-- [ ] Bunu kısalt / karşılaştır / örnek ver akışları.
-- [ ] Oturum ve kullanıcılar arasında bağlam ayrımı.
-- [ ] Temizle düğmesi ve açık saklama politikası.
+- [x] Sınırlı sayıda tur ve toplam metin boyutu (4 tur / 6000 karakter).
+- [x] Takip sorusunu bağımsız arama sorusuna dönüştürmek.
+- [x] Oturum ve kullanıcılar arasında bağlam ayrımı.
+- [x] Temizle düğmesi ve açık saklama politikası.
+- [ ] Bunu kısalt / karşılaştır / örnek ver akışlarını gerçek Ollama ve notlarla doğrulamak.
 
 Kabul: önceki bir cevabı değiştiren takip sorusu çalışır; kaynak etiketleri turlar arasında yanlış bağlanmaz; önceki model cevabı tek başına kanıt kabul edilmez.
 

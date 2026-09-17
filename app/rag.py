@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from sqlalchemy import select
 
 from .citations import valid_citations
+from .conversation import CLARIFY_CONTEXT, resolve_question
 from .db import Chunk, Document, Subject
 from .providers import ModelUnavailable
 from .ranking import bm25, reciprocal_rank_fusion
@@ -1452,7 +1453,25 @@ class RAGService:
             "trace": trace,
         }
 
-    def answer(
+    def answer(self, db, user, subject_id, question, mode="rag", history=None):
+        # Browser history is transient user input, not evidence. Only the
+        # resolved question reaches fresh retrieval and answer verification.
+        if history and self.has_searchable_notes(db, user, subject_id):
+            resolution = resolve_question(self.model, question, history, subject_id)
+            if resolution.unresolved:
+                return {"answer": CLARIFY_CONTEXT, "sources": [], "outcome": "insufficient",
+                        "trace": list(resolution.trace), "resolved_question": question,
+                        "context_used": False}
+            resolved, context_used, context_trace = resolution.question, resolution.used, list(resolution.trace)
+        else:
+            resolved, context_used, context_trace = question, False, []
+        result = self._answer(db, user, subject_id, resolved, mode)
+        result["trace"] = context_trace + result["trace"]
+        result["resolved_question"] = resolved
+        result["context_used"] = context_used
+        return result
+
+    def _answer(
         self,
         db,
         user,
