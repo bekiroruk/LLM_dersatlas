@@ -17,7 +17,7 @@ Python · FastAPI · Ollama · Qwen3 · BGE-M3 · Qdrant · SQLAlchemy
 
 ## Projenin durumu
 
-Uygulama yerelde çalışıyor. Bu repo şimdilik dokümantasyon ve geliştirme araçlarını içeriyor; güncel uygulama kodunun ilk aktarımı bekleniyor.
+Uygulamanın güncel kaynak kodu ve geliştirme araçları bu repoda. Uygulama, yerel Ollama modelleriyle çalışır.
 
 Sıradaki hedef: ders seçmek zorunda kalmadan tüm erişilebilir notlarda arayan **Genel Sohbet**, ardından takip soruları için sohbet bağlamı.
 

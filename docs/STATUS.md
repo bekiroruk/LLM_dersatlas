@@ -1,10 +1,12 @@
 # Proje durumu
 
-Son belge hazırlığı: 2026-09-16.
+İlk uygulama kaynak kodu aktarımı: [78f052f](https://github.com/bekiroruk/LLM_dersatlas/commit/78f052fe0f16d50d59e1ef10f306d51acb0893ed).
 
 ## GitHub
 
-Bu depo dokümantasyon, güvenli paylaşım kontrolü, regresyon testleri ve geliştirme araçlarını içerir. Güncel çalışan uygulama kodunun ilk aktarımı beklenir. Henüz çalıştırılabilir bir uygulama release'i yayımlanmadı.
+Güncel uygulama kodu, web arayüzü, testler, dokümantasyon ve güvenli gün sonu araçları repoda. İlk aktarımda 39 dosya eklendi. Henüz bir release veya yeni sürüm etiketi yayımlanmadı.
+
+Ders materyalleri, yerel ortam ayarları, veritabanı ve vektör indeksleri aktarılmadı.
 
 ## Yerel uygulama
 
@@ -14,16 +16,20 @@ Bu depo dokümantasyon, güvenli paylaşım kontrolü, regresyon testleri ve gel
 - Fethedildi/Fethiye yanlış eşleşmesi için hedefli düzeltme yapıldı.
 - Kullanıcı üç hedefli senaryonun beklenen şekilde cevaplandığını bildirdi.
 
+## Doğrulama
+
+Kullanıcının paylaştığı Windows çıktısında uygulama ve depo araçlarının 60 testi başarılı. Sözdizimi ve Git indeksindeki paylaşım kontrolleri de ilk aktarım öncesinde başarılı tamamlandı.
+
+Bu sonuç, tüm ders belgeleriyle gerçek model doğruluğunu veya güvenlik sertifikasını kanıtlamaz. GitHub Actions sonuçları yerel test kaydından ayrı takip edilir.
+
 ## Bilinen sınırlamalar
 
 - Genel Sohbet henüz eklenmedi; mevcut uygulama ders filtresine bağlı.
 - Takip soruları için sohbet hafızası henüz eklenmedi.
 - Islahat Fermanı'nın tarihi gibi sorularda doğru bilgiyi içeren yeni belgenin bulunması ve yeterli cevabın üretilmesi ayrıca doğrulanmalı.
 - İddia düzeyinde kaynak desteği, sınırlı heuristik kontrollerden daha geniş değerlendirme gerektirir.
-- Bu repoda henüz kullanıcı tarafından aktarılan güncel app kodu yok; otomatik uygulama testleri çalıştırılmış sayılmaz.
-- Üretim, güvenlik sertifikası veya yüzde yüz doğruluk iddiası yok.
 - Otomatik Windows dosya senkronizasyonu veya zamanlanmış push görevi kurulmadı.
 
-## Sıradaki kapı
+## Sıradaki adım
 
-Mevcut Windows çalışma klasörünün Git durumu kontrol edilerek güncel kod güvenli aktarılır. Sonra Genel Sohbet geliştirmesine geçilir.
+Genel Sohbet: kullanıcının erişebildiği tüm derslerde arama, isteğe bağlı ders filtresi ve kaynaklarda ders adının gösterilmesi. Takip soruları için sohbet bağlamı daha sonraki aşama.
