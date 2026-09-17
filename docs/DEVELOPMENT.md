@@ -2,7 +2,7 @@
 
 ## İlk kaynak kodu aktarımı
 
-Uygulamanın çalışan ve en güncel kopyası kullanıcının Windows bilgisayarındadır. Bu depo hazırlığında o kod erişilebilir değildi; eski bir snapshot aktarılmadı.
+İlk aktarım tamamlandı: güncel uygulama kodu 78f052f commit'iyle repoya eklendi. Aşağıdaki bağlantı kontrolleri ilk kurulum içindir. Mevcut kurulumda Genel Sohbet güncellemesi için [kısa rehber](GENERAL_CHAT.md) kullanılır.
 
 Depo kökü, mevcut projedeki **pyproject.toml ve app klasörünün bulunduğu iç dersatlas klasörü** olmalıdır. Dış ZIP klasörünü, Masaüstü'nü veya kullanıcı klasörünü depo kökü yapma.
 
@@ -70,6 +70,8 @@ Araç bilinmeyen bütün kişisel bilgileri veya tüm secret biçimlerini yakala
 Depo araçları Linux ve Windows'ta test edilir. Uygulama app/main.py ve pyproject.toml ile aktarıldıktan sonra uygulama bağımlılıkları kurularak API/çekirdek testleri çalıştırılır. Uygulama yokken uygulama işi açıkça atlanır; depo testlerinin başarısı model kalitesi diye sunulmaz.
 
 CI, gerçek Ollama/model başarımı veya kişisel PDF'lerle RAG değerlendirmesi değildir. JavaScript sözdizimi kontrolü, uygulama kodu aktarılınca CI'da çalıştırılır.
+
+Genel Sohbet ile birlikte node tests/test_chat_ui.js kapsam/istek/kaynak/oturum mantığı testleri CI'a eklendi. Node.js yalnızca bu geliştirici kontrolü içindir; uygulamanın çalışması için yeni bir Node/npm kurulumu gerekmez.
 
 Workflow üçüncü taraf action sürümleri doğrulanmış tam commit SHA değerlerine sabitlenir ve yalnızca contents: read yetkisi kullanır.
 

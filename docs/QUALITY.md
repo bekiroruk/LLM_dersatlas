@@ -37,4 +37,8 @@ Her sonuç için soru kümesi, model sürümü, doküman sürümü, ölçüm tar
 - Uygulama kaynak kodu bulunmuyorsa depo testlerinin başarısı uygulama testi başarısı olarak adlandırılmaz.
 - Gerçek model değerlendirmesi ayrı çalıştırılır; CI için kişisel PDF veya model ağırlığı gerekmez.
 
-Uygulama aktarımı sonrası bu örnekler fake model/vector store testlerine eklenmeli ve gerçek dokümanlarla kontrollü bir değerlendirme yapılmalıdır.
+Genel Sohbet değişikliğinde 92 Python testi gerçek SQLite/gömülü Qdrant ve bir LLM test çiftiyle başarılı. Yeni testler tüm yetkili derslerin birleşimini, tek ders filtresini, sahiplik/üyelik/üyelik iptalini, bozuk vektör yanıtından ACL korumasını, kaynak metadatasını, araştırma ajanının sınırlarını ve eski şemanın veri koruyan geçişini kapsar.
+
+8 JavaScript testi DOM test çiftiyle sohbet kapsamı, istek gövdesi, kaynak kartları ve oturum temizliğini kontrol eder. Gerçek tarayıcı veya görsel QA değildir. Çalıştırma: node tests/test_chat_ui.js. CI bu kontrolleri Python testlerinden ayrı çalıştırır.
+
+Gerçek Ollama modelleri ve kişisel dokümanlarla kontrollü değerlendirme hâlâ gereklidir; otomatik test başarısı bu değerlendirmeyle karıştırılmaz.

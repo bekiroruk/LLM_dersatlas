@@ -70,7 +70,7 @@ class QueryMetric(Base):
     __tablename__ = "query_metrics"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
-    subject_id: Mapped[str] = mapped_column(ForeignKey("subjects.id"), index=True)
+    subject_id: Mapped[str | None] = mapped_column(ForeignKey("subjects.id"), index=True, nullable=True)
     mode: Mapped[str] = mapped_column(String(16))
     outcome: Mapped[str] = mapped_column(String(24))
     elapsed_ms: Mapped[float] = mapped_column(Float)
@@ -97,5 +97,10 @@ def make_database(settings):
             connection.execute("PRAGMA foreign_keys=ON")
             connection.execute("PRAGMA journal_mode=WAL")
     Base.metadata.create_all(engine)
+    from .migrations import migrate_general_metrics
+    try:
+        migrate_general_metrics(engine, settings.data_dir)
+    except Exception:
+        engine.dispose()
+        raise
     return engine, sessionmaker(engine, expire_on_commit=False)
-

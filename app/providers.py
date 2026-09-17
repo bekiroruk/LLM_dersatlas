@@ -106,11 +106,17 @@ class VectorStore:
             self.client.upsert(name, points=[models.PointStruct(id=c.id, vector=v, payload={"subject_id": c.subject_id, "document_id": c.document_id}) for c, v in zip(chunks, vectors, strict=True)], wait=True)
 
     def search(self, model, subject_id, vector, limit=20):
+        # Tek ders çağrıları geriye uyumlu; genel arama da mutlaka ACL listesi alır.
+        subject_ids = [subject_id] if isinstance(subject_id, str) else list(subject_id or [])
+        if not subject_ids:
+            return []
+        match = (models.MatchValue(value=subject_ids[0]) if len(subject_ids) == 1
+                 else models.MatchAny(any=subject_ids))
         with self.lock:
             name = self.collection(model)
             if not self.client.collection_exists(name):
                 return []
-            result = self.client.query_points(name, query=vector, query_filter=models.Filter(must=[models.FieldCondition(key="subject_id", match=models.MatchValue(value=subject_id))]), limit=limit, with_payload=False)
+            result = self.client.query_points(name, query=vector, query_filter=models.Filter(must=[models.FieldCondition(key="subject_id", match=match)]), limit=limit, with_payload=False)
             return [(str(p.id), p.score) for p in result.points]
 
     def delete_document(self, model, document_id):

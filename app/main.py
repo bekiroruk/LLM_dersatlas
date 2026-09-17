@@ -65,7 +65,7 @@ class SubjectBody(BaseModel):
 
 
 class QuestionBody(BaseModel):
-    subject_id: str = Field(min_length=36, max_length=36)
+    subject_id: str | None = Field(default=None, min_length=36, max_length=36)
     question: str = Field(min_length=3, max_length=1200)
     mode: Literal["rag", "agent"] = "rag"
 
@@ -272,13 +272,16 @@ def create_app(settings=None, model=None, vectors=None):
         if not row:
             raise HTTPException(404, "Kaynak bulunamadı.")
         doc = get_document(db, user, row.document_id)
-        if doc.status != "ready":
+        if doc.status != "ready" or row.subject_id != doc.subject_id:
             raise HTTPException(404, "Kaynak şu anda erişilebilir değil.")
-        return {"text": row.text, "location": row.location, "filename": doc.filename, "document_id": doc.id}
+        subject = require_subject(db, user, doc.subject_id)
+        return {"text": row.text, "location": row.location, "filename": doc.filename,
+                "document_id": doc.id, "subject_id": subject.id, "subject_name": subject.name}
 
     @app.post("/api/questions")
     def question(body: QuestionBody, user=Depends(get_user), db=Depends(get_db)):
-        require_subject(db, user, body.subject_id)
+        if body.subject_id is not None:
+            require_subject(db, user, body.subject_id)
         limiter.check("question:" + user.id, 12, 60)
         if len(body.question.strip()) < 3:
             raise HTTPException(422, "Soruyu en az üç karakterle yaz.")
@@ -298,14 +301,19 @@ def create_app(settings=None, model=None, vectors=None):
                 db.commit()
             finally:
                 app.state.question_lock.release()
-        return {**return_result, "elapsed_ms": round(elapsed), "query_id": metric.id}
+        return {**return_result, "elapsed_ms": round(elapsed), "query_id": metric.id,
+                "scope": {"type": "all" if body.subject_id is None else "subject",
+                          "subject_id": body.subject_id}}
 
     @app.post("/api/search")
     def search(body: QuestionBody, user=Depends(get_user), db=Depends(get_db)):
-        require_subject(db, user, body.subject_id)
+        if body.subject_id is not None:
+            require_subject(db, user, body.subject_id)
+        if len(body.question.strip()) < 3:
+            raise HTTPException(422, "Soruyu en az üç karakterle yaz.")
         limiter.check("search:" + user.id, 30, 60)
         try:
-            return {"sources": app.state.rag.retrieve(db, user, body.subject_id, body.question)}
+            return {"sources": app.state.rag.retrieve(db, user, body.subject_id, body.question.strip())}
         except ModelUnavailable as exc:
             raise HTTPException(503, str(exc)) from exc
 

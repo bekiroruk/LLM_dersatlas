@@ -6,20 +6,23 @@ Durumlar: tamamlanan depo hazırlığı, yerelde doğrulanan davranış ve planl
 
 - [x] README, mimari, kalite ve güvenlik belgeleri.
 - [x] Güvenli paylaşım kontrolü ve gün sonu aracı.
-- [ ] Güncel çalışan uygulama kodunun ilk aktarımı.
-- [ ] Aktarılan uygulamada otomatik API/RAG testlerini çalıştırmak.
+- [x] Güncel çalışan uygulama kodunun ilk aktarımı.
+- [x] Aktarılan uygulamada otomatik API/RAG testlerini çalıştırmak.
 - [ ] Açık kaynak lisansını seçmek.
 
 Kabul: app/main.py ve pyproject.toml depo kökünde bulunur; kişisel materyal yoktur; tam test çıktısı kaydedilir. Uygulamanın aktarımı bitmeden çalışır bir GitHub sürümü ilan edilmez.
 
 ## 1. Genel Sohbet
 
-- [ ] API'de isteğe bağlı ders filtresi.
-- [ ] Sunucuda hesaplanan tüm yetkili derslerde hibrit arama.
-- [ ] Doküman yönetiminin ders bazlı kalması.
-- [ ] Sohbetin varsayılan kapsamının tüm yetkili dersler olması.
-- [ ] Ders + dosya + sayfa gösteren kaynak kartları.
-- [ ] Genel sorgular için veriyi koruyan ölçüm/şema geçişi.
+- [x] API'de isteğe bağlı ders filtresi.
+- [x] Sunucuda hesaplanan tüm yetkili derslerde hibrit arama.
+- [x] Doküman yönetiminin ders bazlı kalması.
+- [x] Sohbetin varsayılan kapsamının tüm yetkili dersler olması.
+- [x] Ders + dosya + sayfa gösteren kaynak kartları.
+- [x] Genel sorgular için veriyi koruyan ölçüm/şema geçişi.
+- [x] Araştırma ajanının genel/filtreli kapsamda güvenli arama araçları.
+
+Otomatik API, depolama ve arayüz mantığı kontrolleri başarılı. Gerçek yerel modeller ve kişisel PDF'lerle aşağıdaki kabul senaryoları kullanıcı bilgisayarında ayrıca denenecek.
 
 Kabul:
 

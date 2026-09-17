@@ -1,0 +1,135 @@
+'use strict';
+// DOM test çifti: gerçek tarayıcı/görsel QA değildir; ağ ve ek npm paketi gerekmez.
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const root = path.join(__dirname, '..');
+const html = fs.readFileSync(path.join(root, 'dist/index.html'), 'utf8');
+const source = fs.readFileSync(path.join(root, 'dist/assets/app.js'), 'utf8');
+const elements = new Map();
+
+class Element {
+  constructor(tag = 'div') { this.tagName = tag; this.children = []; this.events = {}; this.value = ''; this.disabled = false; this.dataset = {}; this.className = ''; this._text = ''; this.classList = { toggle() {}, add() {}, remove() {} }; }
+  set id(value) { this._id = value; elements.set(value, this); }
+  get id() { return this._id; }
+  set textContent(value) { this._text = String(value); this.children = []; }
+  get textContent() { return this._text + this.children.map(child => child.textContent).join(' '); }
+  set innerHTML(_) { throw new Error('Kaynaklar innerHTML ile oluşturulmamalı'); }
+  append(...children) { for (const child of children) { child.parent = this; this.children.push(child); } }
+  replaceChildren(...children) { this.children = []; this._text = ''; this.append(...children); }
+  addEventListener(name, handler) { this.events[name] = handler; }
+  setAttribute(name, value) { this[name] = value; }
+  removeAttribute(name) { delete this[name]; }
+  querySelector(selector) { return this.children.find(child => selector === '.' + child.className) || null; }
+  remove() { if (this.parent) this.parent.children = this.parent.children.filter(child => child !== this); }
+  scrollIntoView() {}
+  focus() {}
+}
+for (const match of html.matchAll(/\bid="([^"]+)"/g)) {
+  assert.ok(!elements.has(match[1]), 'Tekil HTML id: ' + match[1]);
+  new Element().id = match[1];
+}
+for (const match of source.matchAll(/\$\('([^']+)'\)/g)) {
+  assert.ok(elements.has(match[1]), 'JS kontrolü HTML içinde bulunmalı: ' + match[1]);
+}
+elements.get('mode').value = 'rag';
+const subjects = [
+  { id: '11111111-1111-4111-8111-111111111111', name: 'Tarih', can_write: true },
+  { id: '22222222-2222-4222-8222-222222222222', name: 'Coğrafya', can_write: true },
+  { id: '33333333-3333-4333-8333-333333333333', name: 'Vatandaşlık', can_write: true },
+];
+const requests = [];
+let availableSubjects = subjects;
+const user = { id: 'user-a', username: 'Test', role: 'admin' };
+const context = vm.createContext({
+  document: { getElementById: id => elements.get(id) || null, createElement: tag => new Element(tag), querySelectorAll: () => [] },
+  window: { addEventListener() {} }, FormData: class {}, AbortController,
+  setTimeout: () => 1, clearTimeout() {}, setInterval() {},
+  async fetch(url, options) {
+    let data;
+    if (url === '/api/me') data = user;
+    else if (url === '/api/subjects') data = availableSubjects;
+    else if (url.endsWith('/documents')) data = [];
+    else if (url === '/api/system') data = { model: { reachable: true, chat_ready: true, embed_ready: true }, qdrant_ready: true, max_upload_mb: 20, worker_enabled: true };
+    else if (url === '/api/dashboard') data = { ready: 3, chunks: 3, query_count: 0, insufficient: 0, p50_ms: null, p95_ms: null, positive_feedback: 0, errors: 0 };
+    else if (url === '/api/questions') {
+      const body = JSON.parse(options.body); requests.push(body);
+      const subject = subjects.find(s => s.id === body.subject_id) || subjects[1];
+      data = { answer: 'Uydurma UI test cevabı. [K1]', outcome: 'answered', elapsed_ms: 25, query_id: 'test-id',
+        trace: [{ tool: 'search_notes', query: body.question, found: 1 }],
+        sources: [{ source_id: 'K1', subject_id: subject.id, subject_name: subject.name, filename: 'Test.pdf', location: 'PDF sayfa 1', text: '<img src=x onerror=neverExecute()>', document_id: 'doc-id' }] };
+    } else data = { ok: true };
+    return { ok: true, status: 200, json: async () => data };
+  },
+});
+vm.runInContext(source, context, { filename: 'dist/assets/app.js' });
+const get = id => elements.get(id);
+let passed = 0;
+function check(description, test) { test(); passed++; console.log('OK: ' + description); }
+async function main() {
+  await new Promise(setImmediate); // Başlangıçtaki sahte API mikro-görevlerini tamamla.
+  check('Varsayılan Genel Sohbet, tüm dersler ve boş doküman seçimi gönderimi engellemez', () => {
+    assert.equal(get('page-title').textContent, 'Genel Sohbet');
+    assert.equal(get('search-subject-select').value, '');
+    assert.equal(get('search-subject-select').children.length, 4);
+    assert.equal(get('send').disabled, false);
+  });
+  get('question').value = 'Türkiye iklim tipleri nelerdir?';
+  await context.submitQuestion();
+  check('Genel RAG isteği ders id yerine null gönderir', () => {
+    assert.equal(requests[0].subject_id, null);
+    assert.equal(requests[0].mode, 'rag');
+  });
+  check('Kaynak kartında ders, dosya, sayfa ve güvenli düz metin bulunur', () => {
+    const text = get('sources').textContent;
+    for (const expected of ['Coğrafya', 'Test.pdf', 'PDF sayfa 1', '<img src=x onerror=neverExecute()>']) assert.ok(text.includes(expected));
+  });
+  const messages = get('messages').children.length;
+  get('subject-select').value = subjects[2].id;
+  get('subject-select').events.change();
+  await new Promise(setImmediate);
+  check('Doküman dersi değişimi sohbeti veya genel arama kapsamını değiştirmez', () => {
+    assert.equal(get('messages').children.length, messages);
+    assert.equal(get('search-subject-select').value, '');
+    assert.equal(get('page-title').textContent, 'Genel Sohbet');
+    assert.equal(get('send').disabled, false);
+  });
+  get('search-subject-select').value = subjects[0].id;
+  get('search-subject-select').events.change();
+  get('question').value = 'Tanzimat ne zaman?';
+  await context.submitQuestion();
+  check('İsteğe bağlı filtre yalnızca açıkça seçilen ders id değerini gönderir', () => {
+    assert.equal(requests[1].subject_id, subjects[0].id);
+    assert.ok(get('page-title').textContent.includes('Tarih'));
+  });
+  get('search-subject-select').value = '';
+  get('search-subject-select').events.change();
+  get('mode').value = 'agent';
+  get('mode').events.change();
+  get('question').value = 'Notlarıma göre karşılaştırma yap.';
+  await context.submitQuestion();
+  check('Araştırma ajanı genel kapsamla gönderilir; adımlar ve güvenli araç açıklaması görünür', () => {
+    assert.equal(requests[2].subject_id, null);
+    assert.equal(requests[2].mode, 'agent');
+    assert.ok(get('messages').textContent.includes('Arama ve doğrulama adımlarını göster'));
+    assert.ok(get('method-hint').textContent.includes('komut çalıştıramaz'));
+    assert.equal(get('search-subject-select').disabled, false);
+  });
+  context.showLogin();
+  check('Çıkışta önceki kaynaklar, sohbet ve filtre temizlenir', () => {
+    assert.equal(get('source-count').textContent, '0');
+    assert.ok(!get('messages').textContent.includes('Uydurma UI test cevabı'));
+    assert.equal(get('send').disabled, true);
+  });
+  availableSubjects = [];
+  await context.loadApp({ id: 'user-b', username: 'Yeni', role: 'student' });
+  check('Yeni oturum önceki ders kapsamını devralmaz; erişim yoksa gönderim kapalıdır', () => {
+    assert.equal(get('search-subject-select').value, '');
+    assert.equal(get('search-subject-select').children.length, 1);
+    assert.equal(get('send').disabled, true);
+    assert.equal(get('source-count').textContent, '0');
+  });
+  console.log(passed + ' arayüz mantığı testi başarılı. Gerçek tarayıcı/görsel test yerine geçmez.');
+}
+main().catch(error => { console.error(error); process.exitCode = 1; });

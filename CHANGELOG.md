@@ -4,6 +4,15 @@ Yalnızca gerçekten yapılan değişiklikler kaydedilir. Planlanan özellikler 
 
 ## Unreleased
 
+### Genel Sohbet ve araştırma ajanı — 2026-09-17
+
+- İsteğe bağlı subject_id: varsayılan tüm yetkili derslerde hibrit arama.
+- Doküman düzenleme seçimi ile sohbet filtresi ayrıldı; kaynaklara ders bilgisi eklendi.
+- Araştırma ajanı genel veya tek ders kapsamını korur; ek aramalar yapar, ilk arama boşsa tekrar deneyebilir.
+- İzin dışı araç/kapsam parametreleri ve bozuk araç çağrıları reddedilir; tur/arama sınırları korunur.
+- Eski SQLite sorgu ölçümleri için yedekli, transaction içinde ve idempotent şema geçişi.
+- 92 Python testi ve 8 JavaScript arayüz mantığı testi yerel Linux ortamında başarılı. Gerçek Ollama/PDF değerlendirmesi veya görsel tarayıcı testi değildir.
+
 ### İlk kaynak kodu aktarımı
 
 - Güncel yerel uygulamanın API, web arayüzü, testler ve kurulum dosyaları eklendi: [78f052f](https://github.com/bekiroruk/LLM_dersatlas/commit/78f052fe0f16d50d59e1ef10f306d51acb0893ed).
@@ -29,6 +38,6 @@ Bu üç sonuç kullanıcı tarafından yerel uygulamada bildirildi; kapsamlı bi
 
 ### Pending
 
-- Genel Sohbet ve takip soruları.
+- Takip soruları için sınırlı sohbet bağlamı.
 
 Henüz yeni sürüm etiketi veya release oluşturulmadı.

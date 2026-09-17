@@ -21,6 +21,15 @@ def require_subject(db, user, subject_id, write=False):
     return subject
 
 
+def search_subject_ids(db, user, subject_id=None):
+    """None = tüm erişilebilir dersler; boş liste asla filtresiz arama değildir."""
+    if subject_id is not None:
+        return [require_subject(db, user, subject_id).id]
+    return list(db.scalars(
+        select(Subject.id).where(subject_filter(user)).order_by(Subject.id)
+    ))
+
+
 class RateLimiter:
     """Tek süreç sınırı. Çoklu replika için paylaşımlı gateway gerekir."""
     def __init__(self):

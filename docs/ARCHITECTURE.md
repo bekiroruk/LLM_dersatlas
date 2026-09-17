@@ -2,7 +2,7 @@
 
 ## Kapsam
 
-Bu belge Windows'ta kullanılan uygulamanın bilinen bileşenlerini ve hedef Genel Sohbet değişikliğini ayırır. Depoya güncel uygulama kodu aktarılana kadar uygulama dosyalarının burada bulunacağı varsayılmaz.
+Bu belge repodaki uygulamanın bileşenlerini açıklar. Dokümanlar derslere göre düzenlenir; Genel Sohbet varsayılan olarak kullanıcının erişebildiği bütün derslerde arar.
 
 ## Doküman işleme ve soru-cevap
 
@@ -36,6 +36,7 @@ Uygulama kökünde şu eşleştirme kullanılır:
 | app/providers.py | Ollama istemcisi ve Qdrant işlemleri |
 | app/rag.py | Soru normalizasyonu, arama, kaynak uygunluğu ve cevap doğrulama |
 | app/db.py | SQL modelleri ve veritabanı bağlantısı |
+| app/migrations.py | Eski SQLite sorgu ölçümlerinin veriyi koruyan şema geçişi |
 | app/security.py | Yetkili dersler ve erişim kontrolü |
 | app/worker.py | Arka plan doküman işleme |
 | dist/index.html | Arayüz yapısı |
@@ -52,7 +53,9 @@ Bu depo hazırlığındaki araçlar:
 
 ## Mevcut arama kapsamı
 
-Yerel uygulama, soruyu seçili dersin dokümanları içinde arar. Ders uygunluğu, soru-cevap uygunluğu ile aynı şey değildir: Coğrafya belgesinde İstanbul ve Fethiye sözcüklerinin bulunması, İstanbul'un fethi hakkında kanıt oluşturmaz.
+API'de subject_id verilmezse veya null ise sunucu sahiplik/üyelik üzerinden tüm yetkili dersleri hesaplar; tek id verilirse erişimi doğrulayıp aramayı o dersle sınırlar. SQL ve Qdrant aramaları aynı yetkili kapsamı kullanır. Qdrant sonuçları ayrıca hazır dokümanların SQL kayıtlarıyla doğrulanır.
+
+Ders uygunluğu, soru-cevap uygunluğu ile aynı şey değildir: Coğrafya belgesinde İstanbul ve Fethiye sözcüklerinin bulunması, İstanbul'un fethi hakkında kanıt oluşturmaz.
 
 Kaynak kontrolleri şu düzeylerde ele alınmalıdır:
 
@@ -64,19 +67,21 @@ Kaynak kontrolleri şu düzeylerde ele alınmalıdır:
 
 Kaynak kimliklerinin geçerli olması yalnızca bu kontrollerin bir kısmıdır.
 
-## Hedef: Genel Sohbet
+## Genel Sohbet ve araştırma ajanı
 
-Doküman yükleme ekranındaki ders seçimi ile sohbetin arama kapsamı ayrılacak:
+Doküman yükleme ekranındaki ders seçimi ile sohbetin arama kapsamı ayrıdır:
 
 - Dokümanların subject_id metadatası korunur.
 - Varsayılan sohbet tüm **yetkili** subject_id değerlerinde arar.
 - İsteğe bağlı tek ders filtresi desteklenir.
 - API, istemcinin gönderdiği ders listesini güvenilir kabul etmez; erişim kapsamını sunucuda hesaplar.
 - Kaynak kartı ders adı, dosya adı ve fiziksel PDF sayfasını içerir.
-- Genel sorguların ölçümleri mevcut veriyi silmeden saklanır; gerekli şema değişikliği geçiş planıyla uygulanır.
+- Genel sorgular QueryMetric.subject_id=null ile kaydedilir; SQLite başlangıcında eski tablo yedek alındıktan sonra idempotent biçimde geçirilir.
 - Sohbet bağlamı sonraki aşamadır; yeni sorular için yeniden yetkili arama ve kanıt kontrolü yapılır.
 
 Global arama için Qdrant filtresini tamamen kaldırmak yeterli ve güvenli bir çözüm değildir.
+
+Araştırma ajanının tek aracı search_notes(query)'dir. Varsayılan en fazla 3 tur ve tur başına 2 çağrı yapar; toplam en fazla 10 kaynak biriktirir. Araç parametresinde ders veya kullanıcı seçilemez. Her arama sunucudaki erişim kontrolünden geçer. Shell, SQL, ağ veya yazma/silme aracı yoktur. Son cevap mevcut RAG kanıt kontrollerinden geçer; ajan cevabın kesin doğru olmasını garanti etmez.
 
 ## Kalıcı ve geçici veri
 

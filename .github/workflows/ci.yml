@@ -83,5 +83,7 @@ jobs:
         run: python scripts/run_tests.py
       - name: Check application Python syntax
         run: python -m compileall -q app scripts tests
-      - name: Check browser JavaScript syntax
-        run: node --check dist/assets/app.js
+      - name: Check browser JavaScript syntax and scope behavior
+        run: |
+          node --check dist/assets/app.js
+          node tests/test_chat_ui.js
