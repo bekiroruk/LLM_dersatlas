@@ -2,6 +2,7 @@
 import sqlite3
 import tempfile
 import unittest
+from contextlib import closing
 from pathlib import Path
 from unittest.mock import patch
 
@@ -76,7 +77,7 @@ class MetricsMigrationTests(unittest.TestCase):
         self.assertIn("custom_metric_outcome", {i["name"] for i in inspect(self.engine).get_indexes("query_metrics")})
         backups = list((self.folder / "schema_backups").glob("*.db"))
         self.assertEqual(len(backups), 1)
-        with sqlite3.connect(str(backups[0])) as db:
+        with closing(sqlite3.connect(str(backups[0]))) as db:
             self.assertEqual(db.execute("SELECT id, feedback FROM query_metrics").fetchall(), [(self.metric_id, -1)])
             column = next(c for c in db.execute("PRAGMA table_info(query_metrics)") if c[1] == "subject_id")
             self.assertEqual(column[3], 1)
