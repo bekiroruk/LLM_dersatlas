@@ -19,7 +19,7 @@ EXPECTED_REMOTES = {
 PUBLIC_DIRS = {"app", "dist", "tests", "samples", "docs", "scripts", ".github"}
 PUBLIC_FILES = {
     "readme.md", "changelog.md", "contributing.md", "security.md",
-    ".gitignore", ".gitattributes", ".env.example", ".env.template",
+    ".gitignore", ".gitattributes", ".dockerignore", ".env.example", ".env.template",
     "pyproject.toml", "requirements.txt", "requirements-dev.txt", "dockerfile",
     "compose.yaml", "compose.gpu.yaml", "compose.offline.yaml",
 }
