@@ -56,6 +56,11 @@ class PathGuardTests(unittest.TestCase):
         self.assertFalse(publishable("app/rag.py.bak_1"))
         self.assertFalse(publishable("samples/my_notes.pdf"))
 
+    def test_dockerignore_is_publishable(self):
+        self.assertTrue(publishable(".dockerignore"))
+        self.assertFalse(publishable(".dockerignore.bak"))
+        self.assertFalse(publishable("MANIFEST.sha256"))
+
 
 class BlobGuardTests(unittest.TestCase):
     def test_known_token_formats(self):
