@@ -1,0 +1,2 @@
+"""DersAtlas application."""
+

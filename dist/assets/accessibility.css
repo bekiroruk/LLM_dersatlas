@@ -1,0 +1,11 @@
+@media (max-width: 700px) {
+  .sidebar .account { display: flex; margin-top: 15px; padding-top: 12px; }
+}
+@media (forced-colors: active) {
+  button, .primary, .secondary, .badge, .source-card { border: 1px solid ButtonText; }
+}
+@media print {
+  .sidebar, .question-form, .topbar, .answer-actions { display: none; }
+  .app-layout, .workspace-grid { display: block; height: auto; }
+  .messages, .sources { max-height: none; overflow: visible; }
+}

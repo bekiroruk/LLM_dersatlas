@@ -1,0 +1,49 @@
+name: dersatlas
+services:
+  app:
+    build: .
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      DATA_DIR: /data
+      DATABASE_URL: sqlite:////data/dersatlas.db
+      OLLAMA_URL: http://ollama:11434
+      QDRANT_URL: http://qdrant:6333
+      CHAT_MODEL: ${CHAT_MODEL:-qwen3:4b}
+      EMBED_MODEL: ${EMBED_MODEL:-bge-m3}
+      ALLOWED_HOSTS: localhost,127.0.0.1
+      COOKIE_SECURE: "false"
+    volumes:
+      - app_data:/data
+    depends_on:
+      - ollama
+      - qdrant
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+  ollama:
+    image: ollama/ollama:0.34.0
+    environment:
+      OLLAMA_NO_CLOUD: "1"
+    volumes:
+      - ollama_models:/root/.ollama
+    restart: unless-stopped
+  qdrant:
+    image: qdrant/qdrant:v1.18.1
+    volumes:
+      - qdrant_data:/qdrant/storage
+    restart: unless-stopped
+volumes:
+  app_data:
+  ollama_models:
+  qdrant_data:

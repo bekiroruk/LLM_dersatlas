@@ -1,0 +1,5 @@
+# Modeller ve imajlar indirildikten sonra mevcut ağa internet çıkışını kapatır.
+# compose.yaml ile birlikte kullanılır; dışarıdan model indirmek bu modda çalışmaz.
+networks:
+  default:
+    internal: true

@@ -1,0 +1,9 @@
+[
+  {"question": "Tanzimat Fermanı hangi tarihte ilan edildi?", "answerable": true, "expected_snippets": ["3 Kasım 1839"]},
+  {"question": "Islahat Fermanı hangi yıl ilan edildi?", "answerable": true, "expected_snippets": ["1856 yılında"]},
+  {"question": "Tanzimat ve Islahat fermanlarını karşılaştır.", "answerable": true, "expected_snippets": ["3 Kasım 1839", "1856 yılında"]},
+  {"question": "Türkiye Büyük Millet Meclisi nerede ve ne zaman açıldı?", "answerable": true, "expected_snippets": ["23 Nisan 1920", "Ankara'da"]},
+  {"question": "Kut anlayışında yönetme yetkisinin kaynağı nedir?", "answerable": true, "expected_snippets": ["ilahî kaynağına"]},
+  {"question": "2026 yılında Almanya'nın güncel işsizlik oranı nedir?", "answerable": false, "expected_snippets": []},
+  {"question": "Bu tarih notlarına göre kuantum dolanıklığı denklemini türet.", "answerable": false, "expected_snippets": []}
+]
