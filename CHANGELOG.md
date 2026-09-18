@@ -4,6 +4,13 @@ Yalnızca gerçekten yapılan değişiklikler kaydedilir. Planlanan özellikler 
 
 ## Unreleased
 
+### Açık takip göndermelerinin çözümü — 2026-09-18
+
+- “Bu iki iklimin…” gibi açık göndermeler, son bağımsız karşılaştırma sorusunun konu adlarıyla model çağrısı olmadan açılır; “Bunu kısalt” da önceki bağımsız soruya bağlanır. Konu veya cevap bilgisi koda sabitlenmez.
+- Daha karmaşık göndermelerde mevcut yerel model ve sıkı çıktı kontrolleri korunur. Reddin güvenli nedeni arama adımlarında gösterilir; ham model çıktısı/geçmiş ifşa edilmez.
+- Yeni konu, farklı kapsam, farklı isim veya üçlü karşılaştırma yanlışlıkla bu dar kurala bağlanmaz. Her cevap için yeniden yetkili kaynak araması gerekir.
+- 122 Python ve 15 JavaScript mantık testi yerel Linux ortamında başarılı; gerçek Ollama/PDF kabul denemesi kullanıcı bilgisayarında yeniden yapılmalı.
+
 ### Oturum içi sohbet bağlamı — 2026-09-17
 
 - Son en fazla 4 tur / 6000 karakter yalnızca açık sayfanın RAM'inde tutulur; kalıcı sohbet tablosu, localStorage veya yeni bağımlılık yok.

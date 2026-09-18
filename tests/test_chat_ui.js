@@ -42,6 +42,7 @@ const subjects = [
 const requests = [];
 let availableSubjects = subjects;
 let questionAnswer = 'Uydurma UI test cevabı. [K1]';
+let questionTrace = null;
 let questionError = false, holdQuestion = false, releaseQuestion;
 const user = { id: 'user-a', username: 'Test', role: 'admin' };
 const context = vm.createContext({
@@ -63,7 +64,9 @@ const context = vm.createContext({
       data = { answer: questionAnswer, outcome: 'answered', elapsed_ms: 25, query_id: 'test-id',
         context_used: body.history.length > 0 && body.question.startsWith('Peki'),
         resolved_question: body.question.startsWith('Peki') ? 'Karadeniz ve Akdeniz iklimlerinin bitki örtüsü nasıl farklıdır?' : body.question,
-        trace: [{ tool: 'search_notes', query: body.question, found: 1 }],
+        trace: questionTrace || (body.question.startsWith('Peki')
+          ? [{ tool: 'conversation_context', method: 'explicit_reference', query: 'Karadeniz ve Akdeniz iklimi açısından bitki örtüsü nasıl farklı?', found: 1 }]
+          : [{ tool: 'search_notes', query: body.question, found: 1 }]),
         sources: [{ source_id: 'K1', subject_id: subject.id, subject_name: subject.name, filename: 'Test.pdf', location: 'PDF sayfa 1', text: '<img src=x onerror=neverExecute()>', document_id: 'doc-id' }] };
     } else data = { ok: true };
     return { ok: true, status: 200, json: async () => data };
@@ -135,6 +138,7 @@ async function main() {
     assert.ok(!history[0].answer.includes('[K1]'));
     assert.equal(history[0].sources, undefined);
     assert.ok(get('messages').textContent.includes('Bağlamla anlaşılan soru: Karadeniz ve Akdeniz'));
+    assert.ok(get('messages').textContent.includes('açık gönderme doğrudan çözüldü'));
   });
   get('mode').value = 'rag'; get('mode').events.change();
   get('question').value = 'Bunu kısalt.';
@@ -143,6 +147,18 @@ async function main() {
     assert.equal(requests[4].mode, 'rag');
     assert.equal(requests[4].history.length, 2);
     assert.equal(requests[4].history[1].resolved_question, 'Karadeniz ve Akdeniz iklimlerinin bitki örtüsü nasıl farklıdır?');
+  });
+  questionTrace = [
+    { tool: 'conversation_context', reason: 'invalid_json_or_schema' },
+    { tool: 'conversation_context', reason: 'PRIVATE_TEST_MARKER' },
+  ];
+  get('question').value = 'Başka bir bağlam denemesi';
+  await context.submitQuestion();
+  questionTrace = null;
+  check('Bağlam reddinin güvenli açıklaması görünür; bilinmeyen ham hata kodu basılmaz', () => {
+    assert.ok(get('messages').textContent.includes('Modelin bağlam çıktısı JSON şemasına uymadı'));
+    assert.ok(get('messages').textContent.includes('Bağlam doğrulaması başarısız'));
+    assert.ok(!get('messages').textContent.includes('PRIVATE_TEST_MARKER'));
   });
   questionAnswer = 'Uzun cevap '.repeat(300);
   for (let index = 0; index < 7; index++) {

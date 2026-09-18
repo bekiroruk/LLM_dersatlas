@@ -204,7 +204,8 @@ async function submitQuestion(event) {
       const details = node('details', undefined, 'trace'); details.append(node('summary', 'Arama ve doğrulama adımlarını göster'));
       const list = node('ol');
       const stepNames = { conversation_context: 'Sohbet bağlamını çözümleme', search_notes: 'Notlarda arama', rejected: 'İzin verilmeyen araç veya parametre reddedildi', relevance_gate: 'Kaynak ilgisi kontrolü', extractive_fallback: 'Kaynak metninden destekli alıntı' };
-      for (const step of result.trace) list.append(node('li', (stepNames[step.tool] || step.tool) + (step.query ? ': ' + step.query : '') + (step.found !== undefined ? ' · ' + step.found + ' sonuç' : '')));
+      const reasonNames = { invalid_json_or_schema: 'Modelin bağlam çıktısı JSON şemasına uymadı', model_ambiguous: 'Model göndermeyi belirsiz buldu', unchanged_reference: 'Model göndermeyi açık soruya çevirmedi', numbers_changed: 'Model sorudaki sayıları değiştirdi', tools_forbidden: 'Bağlam çözümleyicinin araç isteği reddedildi', invalid_message: 'Geçersiz bağlam mesajı', invalid_content: 'Geçersiz veya aşırı uzun bağlam çıktısı' };
+      for (const step of result.trace) list.append(node('li', (stepNames[step.tool] || step.tool) + (step.query ? ': ' + step.query : '') + (step.method === 'explicit_reference' ? ' · açık gönderme doğrudan çözüldü' : '') + (step.reason ? ' · ' + (reasonNames[step.reason] || 'Bağlam doğrulaması başarısız') : '') + (step.found !== undefined ? ' · ' + step.found + ' sonuç' : '')));
       details.append(list); item.append(details);
     }
     renderSources(result.sources);

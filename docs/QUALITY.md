@@ -48,3 +48,11 @@ Gerçek Ollama modelleri ve kişisel dokümanlarla kontrollü değerlendirme hâ
 Yeni bağlam sürümünde toplam 113 Python ve 14 DOM mantık testi yerel Linux'ta başarılı. Son dört tur / 6000 karakter sınırı, geçersiz rol/kaynak alanlarını reddetme, yalnızca aynı kapsamın son turlarını kullanma, takip zincirinde açık soruyu koruma, eski atıfları çıkarma, yanlış yıl öncülünü yeniden yazımla değiştirmeme ve bozuk model çıktısında açıklama isteme test edildi.
 
 API testleri hem RAG hem ajan için takip sorusunda yeniden gerçek SQLite/Qdrant araması yapıldığını doğrular. Önceki cevap kanıt olarak son modele aktarılmaz; geçmişte Python anlatılması tarih belgelerinden Python cevabı ürettirmez. Güncel yetkiler ve iptal edilmiş üyelikler yine uygulanır. DOM testleri temizleme, filtre/yöntem değişimi, HTTP hatası ve temizlenmiş sohbete gecikmiş cevabın gelmesini kapsar. Bunlar gerçek modelin her göndermeyi doğru anlayacağını kanıtlamaz.
+
+### Bildirilen açık gönderme hatası — 2026-09-18
+
+Kullanıcının “Karadeniz ve Akdeniz iklimini karşılaştır” ardından “Peki bu iki iklimin bitki örtüsü nasıl farklı?” denemesinde bağlam netleştirilemedi. Ham yeniden yazım çıktısı mevcut olmadığından tetiklenen model/JSON kontrolü bilinmiyor. Açık gönderme artık son bağımsız karşılaştırma sorusundan doğrudan açılıyor.
+
+Toplam 122 Python ve 15 DOM mantık testi yerel ortamda başarılı. Yeni regresyonlar bildirilen soruyu yeniden yazım modeli olmadan çözmeyi, başka konu çiftlerini, tırnak/ASCII/sayı varyantlarını, mevcut yıl öncülünü korumayı, son konu değişimini ve yanlış isim/üçlü karşılaştırmada otomatik bağlam eklememeyi kapsar. Model tabanlı yolun bozuk JSON/şema ve sayı değişimi reddi korunur. Arayüz güvenli ret açıklamasını gösterir; bilinmeyen hata içeriğini basmaz.
+
+Bu sonuç takip sorusunun arama metninin çözümünü doğrular; gerçek PDF'lerde bitki örtüsü bilgisinin bulunması ve gerçek Ollama cevabının doğruluğu ayrıca denenmelidir.

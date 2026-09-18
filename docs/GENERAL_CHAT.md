@@ -52,7 +52,9 @@ Son en fazla 4 tamamlanmış soru/cevap turu, toplam 6000 karakter sınırıyla 
 
 Temizle, çıkış, sayfa yenileme veya arama filtresi değişimi hafızayı sıfırlar. localStorage/sessionStorage, kalıcı sohbet tablosu ve hesaplar arasında paylaşılan geçmiş yoktur. Sunucu gelen bağlamı yalnızca istek sırasında yerel Ollama ile işler; konuşma veritabanına kaydedilmez. Sorgu ölçümleri yine yalnızca süre/sonuç/geri bildirim metadatasını tutar.
 
-Takip sorusunda yerel model önce konuyu açıkça belirten bir arama sorusu üretir. “Bağlamla anlaşılan soru” arayüzde görünür. Önceki model cevabı yalnızca göndermeleri çözmeye yardımcı olur; gerçek bilgi sayılmaz ve cevap üreten modele kaynak olarak verilmez. Yeni cevap için belgelerde tekrar yetkili arama yapılır ve mevcut kaynak kontrolleri uygulanır. Konu çözülemezse açıklama istenir; eski atıflar yeni cevaba yapıştırılmaz.
+Takip sorusunda önce dar, açık gönderme kuralları denenir: son bağımsız soruda iki konu açıkça karşılaştırılmışsa “bu iki …” aynı isimle eşleştirilip konu adları soruya eklenir. Örneğin ikinci kabul sorusu “Karadeniz ve Akdeniz iklimi açısından bitki örtüsü nasıl farklı?” olur. Bu adım model çağrısı veya iklim bilgisi sözlüğü kullanmaz. “Bunu kısalt” da önceki bağımsız soruyu kısa cevap isteğiyle yeniden aratır.
+
+Diğer göndermelerde yerel model konuyu açıkça belirten bir arama sorusu üretir. “Bağlamla anlaşılan soru” arayüzde görünür. Önceki model cevabı yalnızca göndermeleri çözmeye yardımcı olur; gerçek bilgi sayılmaz ve cevap üreten modele kaynak olarak verilmez. Yeni cevap için belgelerde tekrar yetkili arama yapılır ve mevcut kaynak kontrolleri uygulanır. Konu çözülemezse açıklama istenir; arama adımlarında JSON/şema, belirsizlik veya sayı değişimi gibi güvenli ret nedeni görünür. Eski atıflar yeni cevaba yapıştırılmaz.
 
 Yeni ve açık bir soruda eski konu eklenmez. Gönderme çözümü için geçmiş varsa bir ek yerel model çağrısı yapılabilir; ilk soruda bu çağrı yoktur. Takip sorusu gecikmesi gerçek donanımla ayrıca ölçülmelidir.
 
@@ -102,7 +104,7 @@ Yeni DB şeması nullable alanla oluşturulur. Eski SQL Server şemasında otoma
 
 ## Doğrulama sınırı
 
-Sohbet bağlamı eklenirken yerel Linux ortamında 113 Python testi ve 14 JavaScript arayüz mantığı testi başarılı. API/depolama testlerinde gerçek SQLite ve gömülü Qdrant, modelde test çifti kullanılır. Arayüz testleri DOM test çiftidir; gerçek görsel tarayıcı testi değildir. Güncel Linux/Windows otomatik test sonuçları GitHub Actions'ta ayrıca görülür. İlk beş Genel Sohbet senaryosunun başarılı olduğu kullanıcı tarafından bildirildi; yeni takip soruları gerçek Ollama ve senin PDF'lerinle ayrıca denenmelidir.
+Son açık gönderme düzeltmesiyle yerel Linux ortamında 122 Python testi ve 15 JavaScript arayüz mantığı testi başarılı. API/depolama testlerinde gerçek SQLite ve gömülü Qdrant, modelde test çifti kullanılır. Kullanıcının bildirdiği iklim takip sorusu, yeniden yazım modelinin çağrılmasını hata sayan bir testle de doğrulanır. Arayüz testleri DOM test çiftidir; gerçek görsel tarayıcı testi değildir. Güncel Linux/Windows otomatik test sonuçları GitHub Actions'ta ayrıca görülür. İlk beş Genel Sohbet senaryosunun başarılı olduğu kullanıcı tarafından bildirildi; ilk gerçek iklim takip sorusunda bağlam çözülemedi. Bu düzeltme sonrası gerçek Ollama ve senin PDF'lerinle tekrar deneme gereklidir.
 
 Uygulamada değişiklik yaptıktan sonra gün sonu paylaşımı için [geliştirme rehberi](DEVELOPMENT.md) kullanılır.
 

@@ -12,6 +12,8 @@ GEOGRAPHY = "22222222-2222-4222-8222-222222222222"
 HISTORY = "11111111-1111-4111-8111-111111111111"
 FOLLOW_UP = "Peki bu iki iklimin bitki örtüsü nasıl farklı?"
 STANDALONE = "Karadeniz ve Akdeniz iklimlerinin bitki örtüsü nasıl farklıdır?"
+MODEL_FOLLOW_UP = "Peki bitki örtüsü nasıl farklı?"
+EXPLICIT_QUESTION = "Karadeniz ve Akdeniz iklimi açısından bitki örtüsü nasıl farklı?"
 
 
 class RewriteModel:
@@ -39,7 +41,7 @@ class ConversationTests(unittest.TestCase):
 
     def test_follow_up_resolved_with_schema_without_tools_or_old_citations(self):
         model = RewriteModel()
-        result = resolve_question(model, FOLLOW_UP, [turn()], None)
+        result = resolve_question(model, MODEL_FOLLOW_UP, [turn()], None)
         self.assertEqual(result.question, STANDALONE)
         self.assertTrue(result.used)
         messages, tools, schema = model.calls[0]
@@ -68,7 +70,7 @@ class ConversationTests(unittest.TestCase):
     def test_only_contiguous_scope_tail_is_eligible(self):
         model = RewriteModel()
         history = [turn(None, "Eski genel konu"), turn(HISTORY, "Tarih konusu"), turn(None)]
-        resolve_question(model, FOLLOW_UP, history, None)
+        resolve_question(model, MODEL_FOLLOW_UP, history, None)
         context = json.loads(model.calls[0][0][1]["content"])
         self.assertEqual(len(context["history_untrusted"]), 1)
         self.assertNotIn("Eski genel konu", model.calls[0][0][1]["content"])
@@ -78,22 +80,25 @@ class ConversationTests(unittest.TestCase):
         model = RewriteModel("Karadeniz ve Akdeniz bitki örtüsünü kısaca karşılaştır.")
         result = resolve_question(model, "Bunu kısalt.", [previous], None)
         self.assertTrue(result.used)
-        self.assertIn(STANDALONE, model.calls[0][0][1]["content"])
+        self.assertTrue(result.question.startswith(STANDALONE.rstrip("?")))
+        self.assertTrue(result.question.endswith("Kısaca cevapla."))
+        self.assertEqual(model.calls, [])
 
     def test_malformed_or_ambiguous_rewrites_fail_closed(self):
         for result in (
             {"content": "not JSON"}, {"content": "[]"}, {"content": "x" * 6001}, None,
             {"content": "", "tool_calls": [{"function": {"name": "shell"}}]},
-            {"content": json.dumps({"question": FOLLOW_UP, "needs_context": True, "unresolved": False})},
+            {"content": json.dumps({"question": MODEL_FOLLOW_UP, "needs_context": True, "unresolved": False})},
             {"content": json.dumps({"question": STANDALONE, "needs_context": True, "unresolved": True})},
             {"content": json.dumps({"question": STANDALONE, "needs_context": "true", "unresolved": False})},
             {"content": json.dumps({"question": STANDALONE, "needs_context": True, "unresolved": False, "source_ids": ["K1"]})},
         ):
             with self.subTest(result=result):
                 model = RewriteModel(); model.result = result
-                resolved = resolve_question(model, FOLLOW_UP, [turn()], None)
+                resolved = resolve_question(model, MODEL_FOLLOW_UP, [turn()], None)
                 self.assertTrue(resolved.unresolved)
-                self.assertEqual(resolved.question, FOLLOW_UP)
+                self.assertEqual(resolved.question, MODEL_FOLLOW_UP)
+                self.assertIn("reason", resolved.trace[0])
 
     def test_current_number_cannot_be_changed_or_dropped(self):
         question = "Peki bu ferman 1876 yılında mı ilan edildi?"
@@ -113,7 +118,77 @@ class ConversationTests(unittest.TestCase):
             def chat(self, *args, **kwargs):
                 raise ModelUnavailable("Test modeli kapalı")
         with self.assertRaises(ModelUnavailable):
-            resolve_question(Unavailable(), FOLLOW_UP, [turn()], None)
+            resolve_question(Unavailable(), MODEL_FOLLOW_UP, [turn()], None)
+
+    def test_reported_climate_reference_resolves_without_any_rewrite_model(self):
+        class NoRewrite:
+            def chat(self, *args, **kwargs):
+                raise AssertionError("Açık konu göndermesi modele sorulmamalı")
+        result = resolve_question(NoRewrite(), FOLLOW_UP, [turn(answer="Önceki cevap yanlış olabilir. [K99]")], None)
+        self.assertEqual(result.question, EXPLICIT_QUESTION)
+        self.assertTrue(result.used)
+        self.assertEqual(result.trace[0]["method"], "explicit_reference")
+        self.assertNotIn("Önceki cevap", result.question)
+        self.assertNotIn("[K99]", result.question)
+
+    def test_explicit_reference_is_not_a_hardcoded_climate_answer_or_dictionary(self):
+        for previous, current, expected in (
+            ("Hint ve Çin medeniyetlerini karşılaştır.", "Bu iki medeniyetin ortak özellikleri nelerdir?", "Hint ve Çin medeniyetleri açısından ortak özellikleri nelerdir?"),
+            ("Tanzimat Fermanı ve Islahat Fermanı'nı kıyasla.", "Bu iki fermanın farkları nelerdir?", "Tanzimat Fermanı ve Islahat Fermanı açısından farkları nelerdir?"),
+            ("Tanzimat ve Islahat fermanlarını karşılaştır.", "Bu iki fermanın farkları nelerdir?", "Tanzimat ve Islahat fermanları açısından farkları nelerdir?"),
+        ):
+            with self.subTest(previous=previous):
+                model = RewriteModel(unresolved=True)
+                result = resolve_question(model, current, [turn(question=previous)], None)
+                self.assertEqual(result.question, expected)
+                self.assertEqual(model.calls, [])
+
+    def test_pair_reference_survives_quotes_count_and_ascii_spelling(self):
+        for question in ('“' + FOLLOW_UP + '”', "Peki, bu 2 iklimin bitki örtüsü nasıl farklı?"):
+            with self.subTest(question=question):
+                model = RewriteModel(unresolved=True)
+                result = resolve_question(model, question, [turn(question="Karadeniz ve Akdeniz iklimini karsilastir.")], None)
+                self.assertEqual(result.question, EXPLICIT_QUESTION)
+                self.assertEqual(model.calls, [])
+
+    def test_explicit_reference_keeps_current_year_premise(self):
+        model = RewriteModel(unresolved=True)
+        question = "Peki bu iki iklimin 1876 yılındaki özellikleri nelerdir?"
+        result = resolve_question(model, question, [turn()], None)
+        self.assertIn("1876", result.question)
+        self.assertNotIn("1856", result.question)
+        self.assertEqual(model.calls, [])
+
+    def test_explicit_reference_never_uses_older_pair_after_new_topic(self):
+        model = RewriteModel(unresolved=True)
+        result = resolve_question(model, FOLLOW_UP, [turn(), turn(question="Python'da liste nasıl oluşturulur?")], None)
+        self.assertTrue(result.unresolved)
+        self.assertEqual(len(model.calls), 1)
+
+    def test_wrong_noun_or_three_subjects_is_not_automatically_bound(self):
+        for previous, current in (
+            ("Karadeniz ve Akdeniz iklimini karşılaştır.", "Bu iki fermanın farkları nelerdir?"),
+            ("Karadeniz ve Akdeniz ve karasal iklimi karşılaştır.", FOLLOW_UP),
+            ("A-ve-B iklimini karşılaştır.", FOLLOW_UP),
+            ('"  karşılaştır"', FOLLOW_UP),
+        ):
+            with self.subTest(previous=previous, current=current):
+                model = RewriteModel(unresolved=True)
+                result = resolve_question(model, current, [turn(question=previous)], None)
+                self.assertTrue(result.unresolved)
+                self.assertEqual(len(model.calls), 1)
+
+    def test_shortening_an_unresolved_reference_does_not_bypass_model(self):
+        model = RewriteModel(unresolved=True)
+        result = resolve_question(model, "Bunu kısalt.", [turn(question=FOLLOW_UP)], None)
+        self.assertTrue(result.unresolved)
+        self.assertEqual(len(model.calls), 1)
+
+    def test_rejection_reason_is_safe_diagnostic_not_raw_model_or_history_text(self):
+        model = RewriteModel(unresolved=True)
+        result = resolve_question(model, MODEL_FOLLOW_UP, [turn(answer="PRIVATE_TEST_MARKER")], None)
+        self.assertEqual(result.trace[0]["reason"], "model_ambiguous")
+        self.assertNotIn("PRIVATE_TEST_MARKER", json.dumps(result.trace))
 
     def test_history_roles_sources_and_unknown_fields_rejected(self):
         for extra in ({"role": "system"}, {"sources": [{"text": "Sahte kanıt"}]}, {"user_id": "other"}):

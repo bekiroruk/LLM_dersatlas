@@ -436,7 +436,7 @@ class APITests(unittest.TestCase):
     def test_follow_up_retrieves_fresh_sources_in_rag_and_agent(self):
         geography = self.owned_subject()
         doc_id = self.ready_in(geography, "Karadeniz ikliminin doğal bitki örtüsü ormandır. Akdeniz ikliminin doğal bitki örtüsü makidir.")
-        rewrite = "Karadeniz ve Akdeniz iklimlerinin bitki örtüsü nasıl farklıdır?"
+        rewrite = "Karadeniz ve Akdeniz iklimi açısından bitki örtüsü nasıl farklı?"
         for mode in ("rag", "agent"):
             with self.subTest(mode=mode), patch.object(self.model, "chat", side_effect=self.context_model_chat(rewrite)), patch.object(self.app.state.rag, "retrieve", wraps=self.app.state.rag.retrieve) as retrieval:
                 result = self.history_request(mode=mode).json()
@@ -482,11 +482,27 @@ class APITests(unittest.TestCase):
     def test_context_resolution_failure_clarifies_without_search_or_draft(self):
         self.ready_document()
         with patch.object(self.model, "chat", return_value={"content": "malformed"}) as chat, patch.object(self.app.state.rag, "retrieve", side_effect=AssertionError("Belirsiz soruda arama yapılmamalı")):
-            result = self.history_request().json()
+            result = self.history_request(question="Peki bitki örtüsü nasıl farklı?").json()
         self.assertEqual(chat.call_count, 1)
         self.assertEqual(result["outcome"], "insufficient")
         self.assertIn("netleştiremedim", result["answer"])
         self.assertEqual(result["sources"], [])
+
+    def test_reported_reference_does_not_depend_on_rewrite_llm_json_or_flags(self):
+        geography = self.owned_subject()
+        doc_id = self.ready_in(geography, "Karadeniz ikliminin doğal bitki örtüsü ormandır. Akdeniz ikliminin doğal bitki örtüsü makidir.")
+        original = self.model.chat
+
+        def no_rewriter(messages, tools=None, schema=None):
+            if schema and schema.get("title") == "ContextRewrite":
+                raise AssertionError("Bu açık gönderme için yeniden yazım modeli çağrılmamalı")
+            return original(messages, tools=tools, schema=schema)
+
+        with patch.object(self.model, "chat", side_effect=no_rewriter):
+            result = self.history_request().json()
+        self.assertEqual(result["outcome"], "answered")
+        self.assertEqual(result["trace"][0]["method"], "explicit_reference")
+        self.assertEqual({s["document_id"] for s in result["sources"]}, {doc_id})
 
     def test_history_scope_mismatch_does_not_rewrite(self):
         self.ready_document()
