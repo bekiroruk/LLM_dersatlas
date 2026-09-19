@@ -226,21 +226,18 @@ class RagContractTests(unittest.TestCase):
             "Karadeniz ikliminde yağış yıl boyunca düzenlidir. "
             "Akdeniz ikliminde yağış düzensizdir ve yaz kuraklığı görülür.",
         )
-        answer = (
-            "Karadeniz ikliminde yağış yıl boyunca düzenlidir ve nemli "
-            "ormanlar görülür; Akdeniz ikliminde yağış düzensizdir, yaz "
-            "kuraklığı ile kızılçam ve maki görülür. [K1] [K2]"
-        )
         result, model = self.run_question(
             question,
             sources=[rainfall, source("plants", TABLE)],
-            responses=[payload(answer, ["K1", "K2"])],
         )
-        context_text = "\n".join(item["text"] for item in self.context(model))
         self.assertEqual(result["outcome"], "answered")
-        self.assertIn("yağış yıl boyunca düzenlidir", context_text)
-        self.assertIn("Nemli ormanlar", context_text)
+        self.assertEqual(result["answer_method"], "structured_evidence")
+        self.assertIn("yıl boyunca düzenlidir", result["answer"])
+        self.assertIn("yağış rejimi: düzensizdir", result["answer"])
+        self.assertIn("Nemli ormanlar", result["answer"])
+        self.assertIn("Kızılçam, maki", result["answer"])
         self.assertEqual({item["chunk_id"] for item in result["sources"]}, {"rainfall", "plants"})
+        self.assertEqual(model.calls, [])
 
     def test_mixed_question_rejects_vegetation_only_sources(self):
         question = (
@@ -251,7 +248,7 @@ class RagContractTests(unittest.TestCase):
         self.assertEqual(result["outcome"], "insufficient")
         self.assertEqual(model.calls, [])
 
-    def test_mixed_question_fallback_quotes_every_requested_aspect(self):
+    def test_mixed_question_uses_structured_evidence_before_model(self):
         question = (
             "Karadeniz ve Akdeniz iklimlerini yağış rejimleri ve doğal "
             "bitki örtüleri bakımından karşılaştır."
@@ -261,21 +258,61 @@ class RagContractTests(unittest.TestCase):
             "Karadeniz ikliminde yağış yıl boyunca düzenlidir. "
             "Akdeniz ikliminde yağış düzensizdir ve yaz kuraklığı görülür.",
         )
-        result, _ = self.run_question(
+        result, model = self.run_question(
             question,
             sources=[rainfall, source("plants", TABLE)],
             responses=[payload("Geçersiz model yanıtı. [K99]", ["K99"])],
         )
         self.assertEqual(result["outcome"], "answered")
-        self.assertEqual(result["answer_method"], "source_excerpt")
-        self.assertIn("yağış yıl boyunca düzenlidir", result["answer"])
-        self.assertIn("yağış düzensizdir", result["answer"])
+        self.assertEqual(result["answer_method"], "structured_evidence")
+        self.assertIn("yıl boyunca düzenlidir", result["answer"])
+        self.assertIn("yağış rejimi: düzensizdir", result["answer"])
         self.assertIn("Nemli ormanlar", result["answer"])
         self.assertIn("Kızılçam, maki", result["answer"])
+        self.assertEqual(model.calls, [])
         self.assertEqual(
             {item["chunk_id"] for item in result["sources"]},
             {"rainfall", "plants"},
         )
+
+    def test_reported_table_rows_become_a_clean_sourced_comparison(self):
+        question = (
+            "Karadeniz ve Akdeniz iklimlerini yağış rejimleri ve doğal "
+            "bitki örtüleri bakımından karşılaştır."
+        )
+        rainfall = source(
+            "rainfall-table",
+            "Yayılış Gürcistan sınırından Bulgaristan sınırına kadar "
+            "Karadeniz kıyıları; İstanbul’un kuzeyi ve Yıldız Dağları "
+            "Yaz Serin ve yağışlı Kış Ilık ve yağışlı "
+            "En fazla yağış Sonbahar\n"
+            "Güney Marmara, Ege kıyıları, Akdeniz kıyıları ve "
+            "Güneydoğu’nun batısı Yaz Sıcak ve kurak "
+            "Kış Ilık ve yağışlı En fazla yağış Kış",
+        )
+        vegetation = source(
+            "vegetation-table",
+            "Flora bölgesi Türkiye'de yayılışı Baskın görünüm\n"
+            "Avrupa-Sibirya Marmara’nın kuzeyi ve Karadeniz kıyı kuşağı "
+            "Nemli ormanlar\n"
+            "Güney Marmara, Ege, Akdeniz ve Güneydoğu’nun batısına "
+            "uzanan Akdeniz iklim sahaları Kızılçam, maki ve kuraklığa "
+            "dayanıklı Akdeniz türleri",
+        )
+        result, model = self.run_question(
+            question,
+            sources=[vegetation, rainfall],
+        )
+
+        self.assertEqual(result["answer_method"], "structured_evidence")
+        self.assertIn("yaz serin ve yağışlı", result["answer"])
+        self.assertIn("en fazla yağış dönemi: sonbahar", result["answer"])
+        self.assertIn("Nemli ormanlar", result["answer"])
+        self.assertIn("yaz sıcak ve kurak", result["answer"])
+        self.assertIn("Kızılçam, maki ve kuraklığa dayanıklı", result["answer"])
+        self.assertNotIn("Yayılış Gürcistan", result["answer"])
+        self.assertNotIn("Notlarındaki ilgili kaynak satırları", result["answer"])
+        self.assertEqual(model.calls, [])
 
     def test_drought_resistant_plants_are_not_rainfall_evidence(self):
         question = (

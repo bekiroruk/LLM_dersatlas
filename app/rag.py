@@ -16,7 +16,7 @@ from .ranking import bm25, reciprocal_rank_fusion
 from .security import search_subject_ids
 
 
-RAG_REVISION = "2026-09-19-source-contract-v8"
+RAG_REVISION = "2026-09-19-source-contract-v9"
 
 
 NO_EVIDENCE = (
@@ -1091,6 +1091,196 @@ def _answer_references(payload, allowed_ids):
     else:
         reason = None
     return answer, selected, reason, bool(inline and (malformed or inline != declared))
+
+
+def _clean_summary_phrase(value):
+    """PDF tablo hücresini kısa cevapta kullanılabilecek biçime getirir."""
+    return re.sub(r"\s+", " ", str(value or "")).strip(" \t\r\n.,;:–—-")
+
+
+def _seasonal_climate_phrase(row, subject, aspect):
+    """Kaynak satırındaki iklim değerlerini yorum katmadan düzenler."""
+    row = _strip_citations(row)
+    if aspect == "precipitation":
+        labels = (
+            ("yaz", r"\byaz\b"),
+            ("kış", r"\b(?:k[ıi]ş|kis)\b"),
+            (
+                "en fazla yağış dönemi",
+                r"\ben\s+fazla\s+(?:yağ[ıi]ş|yagis)\b",
+            ),
+            (
+                "en az yağış dönemi",
+                r"\ben\s+az\s+(?:yağ[ıi]ş|yagis)\b",
+            ),
+        )
+        found = []
+        for label, pattern in labels:
+            match = re.search(pattern, row, flags=re.IGNORECASE | re.UNICODE)
+            if match:
+                found.append((match.start(), match.end(), label))
+        found.sort()
+
+        parts = []
+        for index, (_, end, label) in enumerate(found):
+            limit = found[index + 1][0] if index + 1 < len(found) else len(row)
+            value = _clean_summary_phrase(row[end:limit])
+            if value:
+                value = value[:1].lower() + value[1:]
+                separator = ": " if "dönemi" in label else " "
+                parts.append(f"{label}{separator}{value}")
+        found_labels = {label for _, _, label in found}
+        if {"yaz", "kış"}.issubset(found_labels) and parts:
+            return "; ".join(parts)
+
+    words = list(re.finditer(r"[^\W\d_]+", row, flags=re.UNICODE))
+    start = None
+    for index, word in enumerate(words):
+        if not _same_term(subject, _normalize_text(word.group())):
+            continue
+        start = word.end()
+        for following in words[index + 1:index + 4]:
+            if _normalize_text(following.group()).startswith("iklim"):
+                start = following.end()
+                break
+        break
+
+    phrase = _clean_summary_phrase(row[start:] if start is not None else row)
+    if aspect == "precipitation":
+        phrase = re.sub(
+            r"^(?:yağ[ıi]ş|yagis)(?:lar)?(?:\s+rejim\w*)?\s+",
+            "",
+            phrase,
+            flags=re.IGNORECASE | re.UNICODE,
+        )
+    return phrase
+
+
+def _vegetation_summary_phrase(row, subject):
+    """Konu adından sonraki gerçek bitki değeri hücresini ayıklar."""
+    row = _strip_citations(row)
+    words = list(re.finditer(r"[^\W\d_]+", row, flags=re.UNICODE))
+    normalized = [_normalize_text(word.group()) for word in words]
+    descriptors = {
+        "alpin", "genis", "gur", "igne", "kuru", "kurakliga",
+        "nemli", "seyrek", "yagli", "yaprakli",
+    }
+
+    for subject_index, token in enumerate(normalized):
+        if not _same_term(subject, token):
+            continue
+        for value_index in range(subject_index + 1, len(words)):
+            if not any(
+                _same_term(value, normalized[value_index])
+                for value in VEGETATION_VALUE_TERMS
+            ):
+                continue
+            start_index = value_index
+            while (
+                start_index > subject_index + 1
+                and normalized[start_index - 1] in descriptors
+            ):
+                start_index -= 1
+            return _clean_summary_phrase(row[words[start_index].start():])
+    return ""
+
+
+def _structured_comparison_result(question, sources, trace):
+    """Tam tablo kanıtını model çağırmadan kısa, kaynaklı cevaba çevirir."""
+    subjects = _vegetation_subjects(question)
+    aspects = _requested_climate_aspects(question)
+    # Bu hızlı yol yalnızca ayrıştırıcısı kesin olan yağış+bitki tablosu
+    # içindir. Diğer boyutlar genel model/doğrulama akışında kalır.
+    if len(subjects) < 2 or aspects != ["precipitation"]:
+        return None
+
+    vegetation_rows = {}
+    for source in sources:
+        focus = _focused_vegetation_evidence(question, source["text"])
+        if focus:
+            for subject, row in focus["relations"].items():
+                vegetation_rows.setdefault(subject, (_strip_citations(row), source))
+
+    aspect_rows = {aspect: {} for aspect in aspects}
+    for aspect in aspects:
+        for source in sources:
+            focus = _focused_climate_aspect_evidence(
+                question,
+                source["text"],
+                aspect,
+            )
+            if focus:
+                for subject, row in focus["relations"].items():
+                    aspect_rows[aspect].setdefault(
+                        subject,
+                        (_strip_citations(row), source),
+                    )
+
+    if not all(subject in vegetation_rows for subject in subjects):
+        return None
+    if any(
+        not all(subject in aspect_rows[aspect] for subject in subjects)
+        for aspect in aspects
+    ):
+        return None
+
+    aspect_labels = {
+        "precipitation": "yağış rejimi",
+        "temperature": "sıcaklık",
+        "humidity": "nemlilik",
+        "wind": "rüzgâr rejimi",
+        "pressure": "basınç rejimi",
+    }
+    paragraphs = []
+    selected = []
+    selected_ids = set()
+
+    for subject in subjects:
+        claims = []
+        for aspect in aspects:
+            row, source = aspect_rows[aspect][subject]
+            phrase = _seasonal_climate_phrase(row, subject, aspect)
+            if not phrase:
+                return None
+            claims.append(
+                f"{aspect_labels[aspect]}: {phrase}. [{source['source_id']}]"
+            )
+            if source["source_id"] not in selected_ids:
+                selected.append(source)
+                selected_ids.add(source["source_id"])
+
+        vegetation_row, vegetation_source = vegetation_rows[subject]
+        vegetation = _vegetation_summary_phrase(vegetation_row, subject)
+        if not vegetation:
+            return None
+        claims.append(
+            "Doğal bitki örtüsü: "
+            f"{vegetation}. [{vegetation_source['source_id']}]"
+        )
+        if vegetation_source["source_id"] not in selected_ids:
+            selected.append(vegetation_source)
+            selected_ids.add(vegetation_source["source_id"])
+
+        paragraphs.append(
+            f"{subject.capitalize()} iklimi — " + " ".join(claims)
+        )
+
+    answer = "\n\n".join(paragraphs)
+    known_ids = {source["source_id"] for source in sources}
+    if not valid_citations(answer, selected_ids, known_ids):
+        return None
+
+    trace.append({
+        "tool": "structured_evidence_answer",
+        "found": len(selected),
+    })
+    return {
+        "answer": answer,
+        "sources": selected,
+        "outcome": "answered",
+        "answer_method": "structured_evidence",
+        "trace": trace,
+    }
 
 
 def _focused_excerpt_result(question, sources, trace):
@@ -2464,6 +2654,14 @@ class RAGService:
         allowed_ids = [source["source_id"] for source in sources]
         trace.append({"tool": "answer_context", "found": len(sources),
                       "source_ids": allowed_ids})
+
+        structured = _structured_comparison_result(
+            question,
+            evidence_sources,
+            trace,
+        )
+        if structured is not None:
+            return structured
 
         context = json.dumps(
             [

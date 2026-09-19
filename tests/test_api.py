@@ -667,7 +667,7 @@ class APITests(unittest.TestCase):
             "source_ids": ["K99"],
             "insufficient_evidence": False,
         })}
-        with patch.object(self.model, "chat", return_value=invalid):
+        with patch.object(self.model, "chat", return_value=invalid) as model_call:
             result = self.client.post(
                 "/api/questions",
                 json={"question": question, "mode": "rag"},
@@ -675,13 +675,14 @@ class APITests(unittest.TestCase):
             ).json()
 
         self.assertEqual(result["outcome"], "answered")
-        self.assertEqual(result["answer_method"], "source_excerpt")
-        self.assertIn("yağış yıl boyunca düzenlidir", result["answer"])
-        self.assertIn("yağış rejimi düzensizdir", result["answer"])
+        self.assertEqual(result["answer_method"], "structured_evidence")
+        self.assertIn("yıl boyunca düzenlidir", result["answer"])
+        self.assertIn("yağış rejimi: düzensizdir", result["answer"])
         self.assertIn("Nemli ormanlar", result["answer"])
         self.assertIn("Kızılçam, maki", result["answer"])
         self.assertNotIn("Doğu Karadeniz güney yamacı", result["answer"])
         self.assertNotIn("orman yangını hassasiyeti", result["answer"])
+        model_call.assert_not_called()
 
     def test_exact_climate_follow_up_after_detailed_comparison_is_resolved(self):
         geography = self.owned_subject()

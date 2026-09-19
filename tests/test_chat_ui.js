@@ -157,6 +157,7 @@ async function main() {
     { tool: 'citation_retry', reason: 'unknown_source_ids' },
     { tool: 'citation_validation', reason: 'missing_source_ids' },
     { tool: 'focused_source_excerpt' },
+    { tool: 'structured_evidence_answer' },
   ];
   questionMethod = 'source_excerpt';
   get('question').value = 'Başka bir bağlam denemesi';
@@ -176,6 +177,7 @@ async function main() {
     assert.ok(text.includes('Model kendisine verilmeyen bir kaynak numarası kullandı'));
     assert.ok(text.includes('Model kaynak numarası belirtmedi'));
     assert.ok(text.includes('İlgili kaynak satırları doğrudan gösterildi'));
+    assert.ok(text.includes('Doğrulanmış kaynaklardan karşılaştırma oluşturuldu'));
   });
   questionAnswer = 'Uzun cevap '.repeat(300);
   for (let index = 0; index < 7; index++) {
