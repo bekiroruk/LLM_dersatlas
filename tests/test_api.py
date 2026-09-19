@@ -533,6 +533,8 @@ class APITests(unittest.TestCase):
                 "Karadeniz ve Akdeniz iklimi açısından bitki örtüsü nasıl farklı?",
                 "Karadeniz iklimi bitki örtüsü nasıl farklı",
                 "Akdeniz iklimi bitki örtüsü nasıl farklı",
+                "Karadeniz iklimi bitki örtüsü nasıl farklı flora bitki varlığı baskın görünüm",
+                "Akdeniz iklimi bitki örtüsü nasıl farklı flora bitki varlığı baskın görünüm",
             ],
         )
         insufficient = {"role": "assistant", "content": json.dumps({
@@ -556,6 +558,47 @@ class APITests(unittest.TestCase):
         self.assertEqual(result["outcome"], "insufficient")
         self.assertNotIn("Yer şekilleri", result["answer"])
         self.assertTrue(any(step["tool"] == "comparison_evidence_insufficient" for step in result["trace"]))
+
+    def test_vegetation_question_prefers_explicit_pdf_row_and_focuses_prompt(self):
+        geography = self.owned_subject()
+        catalog = self.ready_in(
+            geography,
+            "İklim: Akdeniz, Karadeniz, karasal iklim bölgeleri. "
+            "Bitki örtüsü: Orman, maki, bozkır, çayır bölgeleri.",
+        )
+        evidence = self.ready_in(
+            geography,
+            "11. TÜRKİYE'NİN BİTKİ VARLIĞI\n"
+            "11.1. Flora bölgeleri\n"
+            "Flora bölgesi Türkiye'de yayılışı Baskın görünüm\n"
+            "Avrupa-Sibirya Marmara'nın kuzeyi ve Karadeniz kıyı\n"
+            "kuşağı Nemli ormanlar\n"
+            "Akdeniz\nGüney Marmara, Ege, Akdeniz iklim sahaları\n"
+            "Kızılçam, maki ve kuraklığa dayanıklı Akdeniz türleri\n"
+            "Relikt: Karadeniz'de kızılçam.",
+        )
+        question = "Karadeniz ikliminin doğal bitki örtüsü nedir?"
+
+        with self.app.state.sessions() as db:
+            user = db.scalar(select(User).where(User.username == "bekir"))
+            sources = self.app.state.rag.retrieve(db, user, None, question)
+        self.assertEqual(sources[0]["document_id"], evidence)
+        self.assertNotEqual(sources[0]["document_id"], catalog)
+
+        grounded = {"role": "assistant", "content": json.dumps({
+            "answer": "Karadeniz kıyı kuşağının doğal bitki örtüsü nemli ormanlardır. [K1]",
+            "source_ids": ["K1"], "insufficient_evidence": False,
+        })}
+        with patch.object(self.model, "chat", return_value=grounded) as chat:
+            result = self.client.post(
+                "/api/questions",
+                json={"question": question, "mode": "rag"},
+                headers=self.headers,
+            ).json()
+        self.assertEqual(result["outcome"], "answered")
+        prompt = chat.call_args_list[0].args[0][1]["content"]
+        self.assertIn("Karadeniz kıyı kuşağı Nemli ormanlar", prompt)
+        self.assertNotIn("Bitki örtüsü: Orman, maki, bozkır", prompt)
 
     def test_history_scope_mismatch_does_not_rewrite(self):
         self.ready_document()

@@ -5,7 +5,7 @@ from app.ranking import tokenize, bm25, reciprocal_rank_fusion
 from app.passwords import hash_password, check_password, token_hash
 from app.citations import valid_citations
 from app.ingestion import Section, DocumentError, chunk_sections, extract_document, clean_text
-from app.rag import _retrieval_queries
+from app.rag import _focused_vegetation_evidence, _retrieval_queries
 from pypdf import PdfWriter
 from docx import Document as WordDocument
 
@@ -19,8 +19,31 @@ class CoreTests(unittest.TestCase):
                 question,
                 "Karadeniz iklimi bitki örtüsü nasıl farklı",
                 "Akdeniz iklimi bitki örtüsü nasıl farklı",
+                "Karadeniz iklimi bitki örtüsü nasıl farklı flora bitki varlığı baskın görünüm",
+                "Akdeniz iklimi bitki örtüsü nasıl farklı flora bitki varlığı baskın görünüm",
             ],
         )
+
+    def test_vegetation_table_row_is_kept_as_one_evidence_relation(self):
+        text = """11. TÜRKİYE'NİN BİTKİ VARLIĞI
+11.1. Flora bölgeleri
+Flora bölgesi Türkiye'de yayılışı Baskın görünüm
+Avrupa-Sibirya Marmara'nın kuzeyi ve Karadeniz kıyı
+kuşağı Nemli ormanlar
+Akdeniz
+Güney Marmara, Ege, Akdeniz ve
+Güneydoğu'nun batısına uzanan
+Akdeniz iklim sahaları
+Kızılçam, maki ve kuraklığa dayanıklı Akdeniz türleri
+Relikt Karadeniz'de kızılçam; Akdeniz'de kayın."""
+        focus = _focused_vegetation_evidence(
+            "Karadeniz ve Akdeniz iklimi açısından bitki örtüsü nasıl farklı?",
+            text,
+        )
+        self.assertEqual(focus["covered"], ("karadeniz", "akdeniz"))
+        self.assertIn("Karadeniz kıyı kuşağı Nemli ormanlar", focus["text"])
+        self.assertIn("Akdeniz iklim sahaları Kızılçam, maki", focus["text"])
+        self.assertNotIn("Relikt", focus["text"])
 
     def test_turkish_case(self):
         self.assertEqual(tokenize("ISLAHAT İSTANBUL ve 1839"), ["ıslahat", "istanbul", "1839"])
