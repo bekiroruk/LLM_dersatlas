@@ -43,6 +43,7 @@ const requests = [];
 let availableSubjects = subjects;
 let questionAnswer = 'Uydurma UI test cevabı. [K1]';
 let questionTrace = null;
+let questionMethod = null;
 let questionError = false, holdQuestion = false, releaseQuestion;
 const user = { id: 'user-a', username: 'Test', role: 'admin' };
 const context = vm.createContext({
@@ -61,7 +62,7 @@ const context = vm.createContext({
       if (questionError) return { ok: false, status: 503, json: async () => ({ detail: 'Test modeli kapalı' }) };
       if (holdQuestion) await new Promise(resolve => { releaseQuestion = resolve; });
       const subject = subjects.find(s => s.id === body.subject_id) || subjects[1];
-      data = { answer: questionAnswer, outcome: 'answered', elapsed_ms: 25, query_id: 'test-id',
+      data = { answer: questionAnswer, answer_method: questionMethod, outcome: 'answered', elapsed_ms: 25, query_id: 'test-id',
         context_used: body.history.length > 0 && body.question.startsWith('Peki'),
         resolved_question: body.question.startsWith('Peki') ? 'Karadeniz ve Akdeniz iklimlerinin bitki örtüsü nasıl farklıdır?' : body.question,
         trace: questionTrace || (body.question.startsWith('Peki')
@@ -153,16 +154,28 @@ async function main() {
     { tool: 'conversation_context', reason: 'PRIVATE_TEST_MARKER' },
     { tool: 'comparison_fallback_rejected' },
     { tool: 'comparison_evidence_insufficient' },
+    { tool: 'citation_retry', reason: 'unknown_source_ids' },
+    { tool: 'citation_validation', reason: 'missing_source_ids' },
+    { tool: 'focused_source_excerpt' },
   ];
+  questionMethod = 'source_excerpt';
   get('question').value = 'Başka bir bağlam denemesi';
   await context.submitQuestion();
   questionTrace = null;
+  questionMethod = null;
   check('Bağlam reddinin güvenli açıklaması görünür; bilinmeyen ham hata kodu basılmaz', () => {
     assert.ok(get('messages').textContent.includes('Modelin bağlam çıktısı JSON şemasına uymadı'));
     assert.ok(get('messages').textContent.includes('Bağlam doğrulaması başarısız'));
     assert.ok(get('messages').textContent.includes('Dağınık kaynak parçaları karşılaştırma cevabı olarak reddedildi'));
     assert.ok(get('messages').textContent.includes('İki konu için açık karşılaştırma kanıtı bulunamadı'));
     assert.ok(!get('messages').textContent.includes('PRIVATE_TEST_MARKER'));
+  });
+  check('Kaynak alıntısı ve atıf hatası nedenleri kullanıcıya açıkça gösterilir', () => {
+    const text = get('messages').textContent;
+    assert.ok(text.includes('Kaynak metninden doğrudan alıntı'));
+    assert.ok(text.includes('Model kendisine verilmeyen bir kaynak numarası kullandı'));
+    assert.ok(text.includes('Model kaynak numarası belirtmedi'));
+    assert.ok(text.includes('İlgili kaynak satırları doğrudan gösterildi'));
   });
   questionAnswer = 'Uzun cevap '.repeat(300);
   for (let index = 0; index < 7; index++) {

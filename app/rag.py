@@ -15,6 +15,9 @@ from .ranking import bm25, reciprocal_rank_fusion
 from .security import search_subject_ids
 
 
+RAG_REVISION = "2026-09-19-source-contract-v2"
+
+
 NO_EVIDENCE = (
     "Bu soruyu yanıtlamak için arama kapsamındaki erişilebilir notlarda yeterli "
     "kaynak bulamadım. İlgili notu yükleyebilir veya soruyu daha açık "
@@ -498,7 +501,16 @@ def _comparison_search_queries(question):
         flags=re.IGNORECASE | re.UNICODE,
     )
     if not match:
-        return []
+        # Paylaşılan isim doğrudan yazıldığında da iki tarafı koru:
+        # "A ve B iklimlerinin doğal bitki örtülerini karşılaştır."
+        match = re.fullmatch(
+            r"(.+?)(?:\s+iklim\w*)?\s+(?:ve|ile)\s+"
+            r"(.+?)\s+(iklim\w*)\s+(.+)",
+            str(question or "").strip().strip(" ?!."),
+            flags=re.IGNORECASE | re.UNICODE,
+        )
+        if not match:
+            return []
 
     left, right, shared_head, request = (
         part.strip() for part in match.groups()
@@ -535,6 +547,8 @@ def _vegetation_search_queries(question):
 
 def _vegetation_subjects(question):
     """Karşılaştırmanın taraflarını veya tek sorunun ana konusunu çıkarır."""
+    if not _asks_about_vegetation(question):
+        return []
     bases = _comparison_search_queries(question) or [question]
     ignored = ("iklim", "dogal", "bitki", "ortu")
     subjects = []
@@ -592,11 +606,19 @@ def _focused_vegetation_evidence(question, text):
     if not subjects:
         return None
 
-    lines = _source_units(text)
+    lines = [
+        part.strip()
+        for line in _source_units(text)
+        for part in re.split(r",\s*(?=[^\W\d_]+\s+iklim\w*)", line,
+                             flags=re.IGNORECASE | re.UNICODE)
+        if part.strip()
+    ]
     selected = []
     covered = []
     marker_total = 0
     relation_total = 0
+    relations = {}
+    headers = []
 
     for subject in subjects:
         candidates = []
@@ -609,15 +631,38 @@ def _focused_vegetation_evidence(question, text):
             end = index
 
             for end in range(index, min(index + 7, len(lines))):
+                # Başka konuya/satıra geçerek eksik değeri doldurma.
+                if end > index and any(
+                    other != subject and _term_in_tokens(other, _tokens(lines[end]))
+                    for other in subjects
+                ):
+                    break
+                climate = re.search(r"\b([a-z]+)\s+iklim\w*", _normalize_text(lines[end]))
+                if end > index and climate and not _same_term(subject, climate.group(1)):
+                    break
                 body_parts.append(lines[end])
                 body = " ".join(body_parts)
                 if _has_vegetation_value_after_subject(body, subject):
+                    # Hücre sonu alt satıra taşmışsa cümleyi yarıda kesme.
+                    if end + 1 < len(lines) and re.fullmatch(
+                        re.escape(subject) + r"\s+(?:turler\w*|bitkiler\w*)",
+                        _normalize_text(lines[end + 1]),
+                    ):
+                        body_parts.append(lines[end + 1])
+                        end += 1
                     break
             else:
                 continue
 
             body = " ".join(body_parts).strip()
+            if not _has_vegetation_value_after_subject(body, subject):
+                continue
             body_tokens = _tokens(body)
+            normalized_body = _normalize_text(body)
+            if re.match(r"iklim(?:ler|bolgeleri)?\b", normalized_body) and re.search(
+                r"\bbitki\s+ortu\w*", normalized_body
+            ):
+                continue
             listed_values = {
                 value
                 for value in VEGETATION_VALUE_TERMS
@@ -630,26 +675,45 @@ def _focused_vegetation_evidence(question, text):
 
             context = " ".join(lines[max(0, index - 4):end + 1])
             markers = _vegetation_marker_count(context)
+            # Yakındaki bir ağaç adı, iklimin doğal örtüsü demek değildir.
+            # Açık bitki alanı veya flora tablosu başlığı gereklidir.
+            explicit_climate = bool(re.search(
+                r"\b" + re.escape(subject) + r"\w*\s+iklim\w*\b",
+                normalized_body,
+            ))
+            if not markers and not explicit_climate:
+                continue
+            if re.search(r"\b(?:relikt|endemik|toprak\w*)\b", _normalize_text(body)):
+                continue
             relation = int(bool(re.search(
                 r"\b(?:iklim\w*|kiyi\s+kusag\w*)\b",
                 _normalize_text(context),
             )))
+            header = next(
+                (candidate for candidate in reversed(lines[max(0, index - 4):index])
+                 if _vegetation_marker_count(candidate)),
+                "",
+            )
 
             candidates.append((
                 markers,
                 relation,
                 -len(body),
                 body,
+                header,
             ))
 
         if not candidates:
             continue
 
-        markers, relation, _, body = max(candidates)
+        markers, relation, _, body, header = max(candidates)
+        if header and header not in headers:
+            headers.append(header)
         normalized_body = _normalize_text(body)
         if normalized_body not in {_normalize_text(item) for item in selected}:
             selected.append(body)
         covered.append(subject)
+        relations[subject] = body
         marker_total += markers
         relation_total += relation
 
@@ -657,10 +721,11 @@ def _focused_vegetation_evidence(question, text):
         return None
 
     return {
-        "text": "\n".join(selected),
+        "text": "\n".join(headers + selected),
         "covered": tuple(covered),
         "marker_count": marker_total,
         "relation_count": relation_total,
+        "relations": relations,
     }
 
 
@@ -693,11 +758,10 @@ def _sources_are_relevant(question, sources):
                 if not any(_same_term(subject, known) for known in covered):
                     covered.append(subject)
 
-        if all(
+        return all(
             any(_same_term(subject, known) for known in covered)
             for subject in vegetation_subjects
-        ):
-            return True
+        )
 
     if len(anchors) <= 2:
         required = len(anchors)
@@ -747,27 +811,16 @@ def _sources_are_relevant(question, sources):
 def _normalize_citation_shapes(answer):
     answer = str(answer or "")
 
-    # Küçük yerel modeller aynı atfı farklı parantezlerle
-    # yazabiliyor. Kaynak numarasını değiştirmeden tek biçime getir.
-    answer = re.sub(
-        r"(?:【|\(|（)\s*(K\d+)\s*(?:】|\)|）)",
-        lambda match: (
-            f"[{match.group(1).upper()}]"
-        ),
-        answer,
-        flags=re.IGNORECASE,
-    )
-
     def expand_grouped(match):
         content = re.sub(
             r"\b(?:ve|and)\b",
             ",",
-            match.group(1),
+            next(group for group in match.groups() if group is not None),
             flags=re.IGNORECASE,
         )
 
         if not re.fullmatch(
-            r"\s*K\d+(?:\s*(?:[,;/|&]|\s)\s*K\d+)+\s*",
+            r"\s*K\d+(?:\s*(?:[,;/|&]|\s)\s*K\d+)*\s*",
             content,
             flags=re.IGNORECASE,
         ):
@@ -785,7 +838,8 @@ def _normalize_citation_shapes(answer):
         )
 
     return re.sub(
-        r"\[([^\[\]\r\n]+)\]",
+        r"\[([^\[\]\r\n]+)\]|【([^【】\r\n]+)】|"
+        r"\(([^()\r\n]+)\)|（([^（）\r\n]+)）",
         expand_grouped,
         answer,
         flags=re.IGNORECASE,
@@ -835,6 +889,55 @@ def _declared_source_ids(values):
         )
 
     return ids, invalid
+
+
+def _answer_references(payload, allowed_ids):
+    """Bir numarayı başka kaynağa eşleştirmeden, atıfları doğrular."""
+    answer = _normalize_citation_shapes(payload.answer)
+    inline = {value.upper() for value in CITATION_PATTERN.findall(answer)}
+    declared, malformed = _declared_source_ids(payload.source_ids)
+    selected = inline or declared
+    if not selected:
+        reason = "missing_source_ids"
+    elif not selected.issubset(allowed_ids):
+        reason = "unknown_source_ids"
+    elif not inline and malformed:
+        reason = "malformed_source_ids"
+    else:
+        reason = None
+    return answer, selected, reason, bool(inline and (malformed or inline != declared))
+
+
+def _focused_excerpt_result(question, sources, trace):
+    """Açık konu-değer satırları varsa modelden bağımsız, etiketli alıntı."""
+    subjects = _vegetation_subjects(question)
+    if not subjects:
+        return None
+    rows = {}
+    for source in sources:
+        focus = _focused_vegetation_evidence(question, source["text"])
+        if focus:
+            for subject, row in focus["relations"].items():
+                rows.setdefault(subject, (_strip_citations(row), source))
+    if not all(subject in rows for subject in subjects):
+        return None
+    parts, selected, seen = [], [], set()
+    for subject in subjects:
+        row, source = rows[subject]
+        key = (source["source_id"], row)
+        if key not in seen:
+            parts.append(f"• {row} [{source['source_id']}]")
+            seen.add(key)
+        if source["source_id"] not in {item["source_id"] for item in selected}:
+            selected.append(source)
+    trace.append({"tool": "focused_source_excerpt", "found": len(selected)})
+    return {
+        "answer": "Notlarındaki ilgili kaynak satırları:\n" + "\n".join(parts),
+        "sources": selected,
+        "outcome": "answered",
+        "answer_method": "source_excerpt",
+        "trace": trace,
+    }
 
 
 def _strip_citations(answer):
@@ -1041,6 +1144,39 @@ def _answer_has_source_support(
 ):
     if not _sources_are_relevant(question, selected_sources):
         return False
+
+    subjects = _vegetation_subjects(question)
+    if subjects:
+        # Aynı sayfada iki bitki adı geçmesi, bunların iki iklim arasında
+        # yer değiştirebileceği anlamına gelmez. Her konuyu kendi satırıyla
+        # karşılaştır; yalnızca ortak kelime sayısını denetleme.
+        evidence = {subject: set() for subject in subjects}
+        for source in selected_sources:
+            focus = _focused_vegetation_evidence(question, source["text"])
+            if focus:
+                for subject, row in focus["relations"].items():
+                    evidence[subject].update(
+                        value for value in VEGETATION_VALUE_TERMS
+                        if _term_in_tokens(value, _tokens(row))
+                    )
+        found = set()
+        pattern = r"\b(?:" + "|".join(re.escape(subject) + r"\w*" for subject in subjects) + r")\b"
+        for unit in _source_units(_strip_citations(answer)):
+            unit = _normalize_text(unit)
+            mentions = list(re.finditer(pattern, unit))
+            for index, match in enumerate(mentions):
+                subject = next((s for s in subjects if _same_term(s, match.group())), None)
+                if subject is None:
+                    return False
+                end = mentions[index + 1].start() if index + 1 < len(mentions) else len(unit)
+                values = {value for value in VEGETATION_VALUE_TERMS
+                          if _term_in_tokens(value, _tokens(unit[match.end():end]))}
+                if values:
+                    if not values.issubset(evidence[subject]):
+                        return False
+                    found.add(subject)
+        if set(subjects) != found:
+            return False
 
     if _question_requests_date(question) and not _has_date_value(answer):
         return False
@@ -1687,7 +1823,16 @@ class RAGService:
         user_content,
         trace,
         phase,
+        allowed_source_ids=None,
+        retry_format=True,
     ):
+        schema = AnswerPayload.model_json_schema()
+        if allowed_source_ids is not None:
+            schema["properties"]["source_ids"]["items"]["enum"] = list(allowed_source_ids)
+            system += (
+                " İzinli kaynak numaraları: " + ", ".join(allowed_source_ids)
+                + ". source_ids için yalnızca bu numaraları kullan."
+            )
         message = self.model.chat(
             [
                 {
@@ -1699,10 +1844,7 @@ class RAGService:
                     "content": user_content,
                 },
             ],
-            schema=(
-                AnswerPayload
-                .model_json_schema()
-            ),
+            schema=schema,
         )
 
         try:
@@ -1713,6 +1855,8 @@ class RAGService:
                 )
             )
         except ValueError:
+            if not retry_format:
+                return None
             trace.append(
                 {
                     "tool": (
@@ -1742,10 +1886,7 @@ class RAGService:
                     "content": user_content,
                 },
             ],
-            schema=(
-                AnswerPayload
-                .model_json_schema()
-            ),
+            schema=schema,
         )
 
         try:
@@ -1759,6 +1900,9 @@ class RAGService:
             return None
 
     def _fallback_result(self, question, sources, trace):
+        focused = _focused_excerpt_result(question, sources, trace)
+        if focused is not None:
+            return focused
         if not _sources_are_relevant(question, sources):
             trace.append({
                 "tool": "fallback_relevance_rejected",
@@ -1852,6 +1996,7 @@ class RAGService:
         result["trace"] = context_trace + result["trace"]
         result["resolved_question"] = resolved
         result["context_used"] = context_used
+        result["rag_revision"] = RAG_REVISION
         return result
 
     def _answer(
@@ -1911,7 +2056,7 @@ class RAGService:
                 "trace": trace,
             }
 
-        sources = sources[:10]
+        sources = [dict(source) for source in sources[:10]]
         anchors = _question_anchors(question)
 
         # retrieve() iki-konulu karşılaştırmada her tarafın açık kanıtını
@@ -1956,6 +2101,8 @@ class RAGService:
                     "found": 0,
                 }
             )
+            if _is_comparison_question(question):
+                trace.append({"tool": "comparison_evidence_insufficient", "found": 0})
 
             return {
                 "answer": NO_EVIDENCE,
@@ -1963,14 +2110,6 @@ class RAGService:
                 "outcome": "insufficient",
                 "trace": trace,
             }
-
-        for index, source in enumerate(
-            sources,
-            1,
-        ):
-            source["source_id"] = (
-                f"K{index}"
-            )
 
         context_sources = [
             (source, source["text"])
@@ -2028,6 +2167,21 @@ class RAGService:
                 for subject in vegetation_subjects
             ):
                 context_sources = chosen
+
+        # Numara atama, daraltma ve sıralama BİTTİKTEN sonra yapılır.
+        # Prompt, doğrulayıcı ve kaynak kartları aynı listeyi kullanır.
+        context_sources = [
+            ({**source, "source_id": f"K{index}"}, evidence)
+            for index, (source, evidence) in enumerate(context_sources, 1)
+        ]
+        sources = [source for source, _ in context_sources]
+        evidence_sources = [
+            {**source, "text": evidence}
+            for source, evidence in context_sources
+        ]
+        allowed_ids = [source["source_id"] for source in sources]
+        trace.append({"tool": "answer_context", "found": len(sources),
+                      "source_ids": allowed_ids})
 
         context = json.dumps(
             [
@@ -2092,6 +2246,7 @@ class RAGService:
             user_content,
             trace,
             "draft",
+            allowed_source_ids=allowed_ids,
         )
 
         verifier_system = (
@@ -2146,6 +2301,7 @@ class RAGService:
             verifier_content,
             trace,
             "verification",
+            allowed_source_ids=allowed_ids,
         )
 
         trace.append(
@@ -2159,14 +2315,30 @@ class RAGService:
             }
         )
 
+        known_ids = set(allowed_ids)
+        if verified is not None and not verified.insufficient_evidence:
+            _, _, reason, _ = _answer_references(verified, known_ids)
+            if reason:
+                trace.append({"tool": "citation_retry", "reason": reason, "found": 0})
+                verified = self._call_structured(
+                    verifier_system + " Önceki çıktının kaynak numaraları geçersizdi. "
+                    "Cevabı yalnızca aşağıdaki kaynaklardan yeniden oluştur. "
+                    "Kaynak numaralarını metindeki source_id alanından aynen al.",
+                    user_content, trace, "citation_repair",
+                    allowed_source_ids=allowed_ids, retry_format=False,
+                )
+
         if verified is None:
             return self._fallback_result(
                 question,
-                sources,
+                evidence_sources,
                 trace,
             )
 
         if verified.insufficient_evidence:
+            excerpt = _focused_excerpt_result(question, evidence_sources, trace)
+            if excerpt is not None:
+                return excerpt
             if _is_comparison_question(question):
                 trace.append({
                     "tool": "comparison_evidence_insufficient",
@@ -2198,68 +2370,16 @@ class RAGService:
                 "trace": trace,
             }
 
-        answer = _normalize_citation_shapes(
-            verified.answer
-        )
-
-        inline_ids = {
-            source_id.upper()
-            for source_id
-            in CITATION_PATTERN.findall(answer)
-        }
-
-        (
-            declared_ids,
-            malformed_ids,
-        ) = _declared_source_ids(
-            verified.source_ids
-        )
-
-        known_ids = {
-            source["source_id"]
-            for source in sources
-        }
-
-        # Yalnızca modele gerçekten gönderilen kaynaklar atıf
-        # olarak kabul edilebilir. Cevabın içindeki atıflar
-        # kullanıcıya gösterilen kanıttır; source_ids alanı
-        # yalnızca makine metadatasıdır. Küçük modeller bu
-        # iki alanı farklı yazdığında geçerli görünür atfı
-        # reddetme.
-        context_ids = {
-            source["source_id"]
-            for source, _ in context_sources
-        }
-
-        if inline_ids:
-            referenced_ids = inline_ids
-            citations_valid = (
-                inline_ids.issubset(context_ids)
-            )
-
-            if (
-                malformed_ids
-                or declared_ids != inline_ids
-            ):
-                trace.append({
-                    "tool": "citation_metadata_normalized",
-                    "found": len(inline_ids),
-                })
-        else:
-            referenced_ids = declared_ids
-            citations_valid = (
-                not malformed_ids
-                and bool(declared_ids)
-                and declared_ids.issubset(context_ids)
-            )
-
-        # Bilinmeyen kaynak numarasını sessizce
-        # gerçek bir kaynağa çevirmiyoruz.
-        if (
-            not citations_valid
-            or not referenced_ids
-            or not referenced_ids.issubset(known_ids)
-        ):
+        answer, referenced_ids, reason, normalized = _answer_references(verified, known_ids)
+        if normalized:
+            trace.append({"tool": "citation_metadata_normalized", "found": len(referenced_ids)})
+        if reason:
+            trace.append({"tool": "citation_validation", "reason": reason, "found": 0})
+            # Bozuk model cevabına atıf uydurma. Açık satır varsa yalnızca
+            # o satırı göster; kaynak ilişkisi yoksa ret sonucunu koru.
+            excerpt = _focused_excerpt_result(question, evidence_sources, trace)
+            if excerpt is not None:
+                return excerpt
             return {
                 "answer": (
                     "Modelin kaynak referansları "
@@ -2271,6 +2391,7 @@ class RAGService:
                 "outcome": "invalid_citations",
                 "trace": trace,
             }
+        trace.append({"tool": "citation_validation", "found": len(referenced_ids)})
 
         ordered_ids = [
             source["source_id"]
@@ -2306,14 +2427,14 @@ class RAGService:
 
             return self._fallback_result(
                 question,
-                sources,
+                evidence_sources,
                 trace,
             )
 
         if not _answer_has_source_support(
             clean_answer,
             question,
-            selected_sources,
+            [source for source in evidence_sources if source["source_id"] in selected],
         ):
             trace.append(
                 {
@@ -2326,7 +2447,7 @@ class RAGService:
 
             return self._fallback_result(
                 question,
-                sources,
+                evidence_sources,
                 trace,
             )
 

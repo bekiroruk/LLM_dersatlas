@@ -195,7 +195,8 @@ async function submitQuestion(event) {
     if (result.context_used) item.append(node('p', 'Bağlamla anlaşılan soru: ' + result.resolved_question, 'answer-meta'));
     pending.remove(); item.append(node('div', 'DERSATLAS / KAYNAKLI ÇALIŞMA', 'answer-label'), node('div', result.answer, 'message-answer'));
     const outcomes = { answered: 'Kaynak referansları kontrol edildi', insufficient: 'Kaynak yetersiz', invalid_output: 'Çıktı biçimi doğrulanamadı', invalid_citations: 'Kaynak referansı geçersiz' };
-    item.append(node('p', (outcomes[result.outcome] || result.outcome) + ' · ' + (result.elapsed_ms / 1000).toFixed(1) + ' sn', 'answer-meta'));
+    const outcomeLabel = result.answer_method === 'source_excerpt' ? 'Kaynak metninden doğrudan alıntı' : (outcomes[result.outcome] || result.outcome);
+    item.append(node('p', outcomeLabel + ' · ' + (result.elapsed_ms / 1000).toFixed(1) + ' sn', 'answer-meta'));
     const actions = node('div', undefined, 'answer-actions');
     const sourceButton = node('button', 'Bu cevabın kaynaklarını aç'); sourceButton.addEventListener('click', () => renderSources(result.sources)); actions.append(sourceButton);
     for (const [label, value] of [['Faydalı', 1], ['Kontrol gerekli', -1]]) { const button = node('button', label); button.addEventListener('click', async () => { try { await api('/api/queries/' + result.query_id + '/feedback', { method: 'POST', body: { value } }); toast('Geri bildirimin kaydedildi.'); } catch (e) { toast(e.message, true); } }); actions.append(button); }
@@ -205,6 +206,8 @@ async function submitQuestion(event) {
       const list = node('ol');
       const stepNames = { conversation_context: 'Sohbet bağlamını çözümleme', search_notes: 'Notlarda arama', rejected: 'İzin verilmeyen araç veya parametre reddedildi', relevance_gate: 'Kaynak ilgisi kontrolü', extractive_fallback: 'Kaynak metninden destekli alıntı', comparison_fallback_rejected: 'Dağınık kaynak parçaları karşılaştırma cevabı olarak reddedildi', comparison_evidence_insufficient: 'İki konu için açık karşılaştırma kanıtı bulunamadı' };
       const reasonNames = { invalid_json_or_schema: 'Modelin bağlam çıktısı JSON şemasına uymadı', model_ambiguous: 'Model göndermeyi belirsiz buldu', unchanged_reference: 'Model göndermeyi açık soruya çevirmedi', numbers_changed: 'Model sorudaki sayıları değiştirdi', tools_forbidden: 'Bağlam çözümleyicinin araç isteği reddedildi', invalid_message: 'Geçersiz bağlam mesajı', invalid_content: 'Geçersiz veya aşırı uzun bağlam çıktısı' };
+      Object.assign(stepNames, { answer_context: 'Cevap için seçilen kaynaklar', source_verification: 'Cevabın kaynaklarla kontrolü', citation_retry: 'Kaynak numaraları için bir kez yeniden denendi', citation_validation: 'Kaynak numaralarının kontrolü', citation_metadata_normalized: 'Kaynak numarası yazımı düzeltildi', focused_source_excerpt: 'İlgili kaynak satırları doğrudan gösterildi', unsupported_claim_rejected: 'Kaynakta desteklenmeyen bilgi reddedildi', echo_rejected: 'Soruyu tekrarlayan cevap reddedildi' });
+      Object.assign(reasonNames, { missing_source_ids: 'Model kaynak numarası belirtmedi', unknown_source_ids: 'Model kendisine verilmeyen bir kaynak numarası kullandı', malformed_source_ids: 'Modelin kaynak numarası biçimi geçersiz' });
       for (const step of result.trace) list.append(node('li', (stepNames[step.tool] || step.tool) + (step.query ? ': ' + step.query : '') + (step.method === 'explicit_reference' ? ' · açık gönderme doğrudan çözüldü' : '') + (step.reason ? ' · ' + (reasonNames[step.reason] || 'Bağlam doğrulaması başarısız') : '') + (step.found !== undefined ? ' · ' + step.found + ' sonuç' : '')));
       details.append(list); item.append(details);
     }

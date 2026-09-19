@@ -20,7 +20,7 @@ from .db import make_database, User, LoginSession, Subject, Document, Chunk, Que
 from .security import hash_password, check_password, token_hash, require_subject, subject_filter, RateLimiter
 from .providers import Ollama, VectorStore, ModelUnavailable
 from .worker import IngestWorker
-from .rag import RAGService
+from .rag import RAGService, RAG_REVISION
 from .conversation import HistoryTurn, MAX_HISTORY_TURNS, MAX_HISTORY_CHARS, history_size
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -156,7 +156,7 @@ def create_app(settings=None, model=None, vectors=None):
 
     @app.get("/health")
     def health():
-        return {"status": "alive", "version": "0.1.0"}
+        return {"status": "alive", "version": "0.1.0", "rag_revision": RAG_REVISION}
 
     @app.post("/api/login")
     def login(body: LoginBody, request: Request, response: Response, db=Depends(get_db)):
@@ -356,7 +356,7 @@ def create_app(settings=None, model=None, vectors=None):
         return {"model": app.state.model.status(), "qdrant_ready": app.state.vectors.status(), "chat_model": config.chat_model,
                 "embedding_model": config.embed_model, "database": "SQL Server" if config.database_url.startswith("mssql") else "SQLite",
                 "vector_mode": "Qdrant sunucu" if config.qdrant_url else "Qdrant gömülü", "max_upload_mb": config.max_upload_mb,
-                "worker_enabled": config.worker_enabled, "version": "0.1.0"}
+                "worker_enabled": config.worker_enabled, "version": "0.1.0", "rag_revision": RAG_REVISION}
 
     app.mount("/assets", StaticFiles(directory=ROOT / "dist" / "assets"), name="assets")
 

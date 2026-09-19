@@ -99,6 +99,11 @@ class APITests(unittest.TestCase):
         self.client.cookies.clear()
         self.assertEqual(self.client.get('/api/subjects').status_code, 401)
 
+    def test_running_pipeline_revision_is_visible(self):
+        from app.rag import RAG_REVISION
+        self.assertEqual(self.client.get('/health').json()['rag_revision'], RAG_REVISION)
+        self.assertEqual(self.client.get('/api/system').json()['rag_revision'], RAG_REVISION)
+
     def test_csrf_header_required(self):
         self.assertEqual(self.client.post('/api/subjects', json={"name": "Coğrafya"}).status_code, 403)
 
