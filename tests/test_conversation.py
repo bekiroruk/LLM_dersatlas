@@ -160,6 +160,22 @@ class ConversationTests(unittest.TestCase):
         self.assertNotIn("Önceki cevap", result.question)
         self.assertNotIn("[K99]", result.question)
 
+    def test_reference_uses_common_noun_inside_detailed_comparison(self):
+        class NoRewrite:
+            def chat(self, *args, **kwargs):
+                raise AssertionError("Açık iklim göndermesi modele sorulmamalı")
+
+        previous = "Karadeniz ve Akdeniz iklimlerinin doğal bitki örtülerini karşılaştır."
+        current = "Peki bu iki iklimin doğal bitki örtüsü farkını tek cümlede özetler misin?"
+        result = resolve_question(NoRewrite(), current, [turn(question=previous)], None)
+        self.assertEqual(
+            result.question,
+            "Karadeniz ve Akdeniz iklimleri açısından doğal bitki örtüsü farkını tek cümlede özetler misin?",
+        )
+        self.assertTrue(result.used)
+        self.assertFalse(result.unresolved)
+        self.assertEqual(result.trace[0]["method"], "explicit_reference")
+
     def test_explicit_reference_is_not_a_hardcoded_climate_answer_or_dictionary(self):
         for previous, current, expected in (
             ("Hint ve Çin medeniyetlerini karşılaştır.", "Bu iki medeniyetin ortak özellikleri nelerdir?", "Hint ve Çin medeniyetleri açısından ortak özellikleri nelerdir?"),

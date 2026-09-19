@@ -16,7 +16,7 @@ from .ranking import bm25, reciprocal_rank_fusion
 from .security import search_subject_ids
 
 
-RAG_REVISION = "2026-09-19-source-contract-v4"
+RAG_REVISION = "2026-09-19-source-contract-v5"
 
 
 NO_EVIDENCE = (

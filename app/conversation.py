@@ -102,6 +102,31 @@ def _paired_topic(previous):
     return topic, words[-1]
 
 
+def _topic_for_reference(topic, noun):
+    """Çift konuyu, takip sorusundaki ortak isimde güvenle sonlandırır."""
+    words = topic.split()
+    coordinators = [i for i, word in enumerate(words) if word.casefold() in {"ve", "ile"}]
+    if len(coordinators) != 1:
+        return None
+    noun_forms = _noun_forms(noun)
+    matches = [
+        index for index, word in enumerate(words)
+        if index > coordinators[0] and noun_forms & _noun_forms(word.strip("’'"))
+    ]
+    if not matches:
+        return None
+    words = words[:matches[-1] + 1]
+    # "iklimlerinin" -> "iklimleri", "devletlerin" -> "devletler".
+    # Böylece "... iklimleri açısından" biçiminde bağımsız arama sorusu oluşur.
+    words[-1] = re.sub(
+        r"(?:[’']?n[ıiuü]n|[ıiuü]n)$",
+        "",
+        words[-1],
+        flags=re.I,
+    )
+    return " ".join(words) if words[-1] else None
+
+
 def _explicit_follow_up(question, previous):
     """Narrow, deterministic reference expansion; no answer/model knowledge."""
     plain = question.strip().strip('“”"')
@@ -117,9 +142,12 @@ def _explicit_follow_up(question, previous):
     if not match:
         return None
     pair = _paired_topic(previous)
-    if not pair or not (_noun_forms(match[1]) & _noun_forms(pair[1])):
+    if not pair:
         return None
-    candidate = pair[0] + " açısından " + match[2]
+    topic = _topic_for_reference(pair[0], match[1])
+    if not topic:
+        return None
+    candidate = topic + " açısından " + match[2]
     # The remaining request is copied verbatim, including any year premise.
     # Only the demonstrative '2' is replaced by the explicit two subjects.
     return candidate if len(candidate) <= 1200 else None
