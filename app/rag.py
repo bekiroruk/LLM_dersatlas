@@ -745,19 +745,37 @@ def _sources_are_relevant(question, sources):
 
 
 def _normalize_citation_shapes(answer):
+    answer = str(answer or "")
+
+    # Küçük yerel modeller aynı atfı farklı parantezlerle
+    # yazabiliyor. Kaynak numarasını değiştirmeden tek biçime getir.
     answer = re.sub(
-        r"【\s*(K\d+)\s*】",
+        r"(?:【|\(|（)\s*(K\d+)\s*(?:】|\)|）)",
         lambda match: (
             f"[{match.group(1).upper()}]"
         ),
-        str(answer or ""),
+        answer,
         flags=re.IGNORECASE,
     )
 
     def expand_grouped(match):
+        content = re.sub(
+            r"\b(?:ve|and)\b",
+            ",",
+            match.group(1),
+            flags=re.IGNORECASE,
+        )
+
+        if not re.fullmatch(
+            r"\s*K\d+(?:\s*(?:[,;/|&]|\s)\s*K\d+)+\s*",
+            content,
+            flags=re.IGNORECASE,
+        ):
+            return match.group(0)
+
         ids = re.findall(
             r"K\d+",
-            match.group(1),
+            content,
             flags=re.IGNORECASE,
         )
 
@@ -767,7 +785,7 @@ def _normalize_citation_shapes(answer):
         )
 
     return re.sub(
-        r"\[((?:K\d+\s*,\s*)+K\d+)\]",
+        r"\[([^\[\]\r\n]+)\]",
         expand_grouped,
         answer,
         flags=re.IGNORECASE,
@@ -783,18 +801,37 @@ def _declared_source_ids(values):
             invalid = True
             continue
 
-        match = re.fullmatch(
-            r"\s*\[?\s*(K\d+)\s*\]?\s*",
+        source_ids = re.findall(
+            r"K\d+",
             value,
             flags=re.IGNORECASE,
         )
 
-        if not match:
+        residue = re.sub(
+            r"K\d+",
+            " ",
+            value,
+            flags=re.IGNORECASE,
+        )
+        residue = re.sub(
+            r"\b(?:ve|and)\b",
+            " ",
+            residue,
+            flags=re.IGNORECASE,
+        )
+        residue = re.sub(
+            r"[\s,;:/|&\[\](){}\u3010\u3011（）]+",
+            "",
+            residue,
+        )
+
+        if not source_ids or residue:
             invalid = True
             continue
 
-        ids.add(
-            match.group(1).upper()
+        ids.update(
+            source_id.upper()
+            for source_id in source_ids
         )
 
     return ids, invalid
@@ -2183,18 +2220,45 @@ class RAGService:
             for source in sources
         }
 
-        referenced_ids = (
-            inline_ids | declared_ids
-        )
+        # Yalnızca modele gerçekten gönderilen kaynaklar atıf
+        # olarak kabul edilebilir. Cevabın içindeki atıflar
+        # kullanıcıya gösterilen kanıttır; source_ids alanı
+        # yalnızca makine metadatasıdır. Küçük modeller bu
+        # iki alanı farklı yazdığında geçerli görünür atfı
+        # reddetme.
+        context_ids = {
+            source["source_id"]
+            for source, _ in context_sources
+        }
+
+        if inline_ids:
+            referenced_ids = inline_ids
+            citations_valid = (
+                inline_ids.issubset(context_ids)
+            )
+
+            if (
+                malformed_ids
+                or declared_ids != inline_ids
+            ):
+                trace.append({
+                    "tool": "citation_metadata_normalized",
+                    "found": len(inline_ids),
+                })
+        else:
+            referenced_ids = declared_ids
+            citations_valid = (
+                not malformed_ids
+                and bool(declared_ids)
+                and declared_ids.issubset(context_ids)
+            )
 
         # Bilinmeyen kaynak numarasını sessizce
         # gerçek bir kaynağa çevirmiyoruz.
         if (
-            malformed_ids
+            not citations_valid
             or not referenced_ids
-            or not referenced_ids.issubset(
-                known_ids
-            )
+            or not referenced_ids.issubset(known_ids)
         ):
             return {
                 "answer": (

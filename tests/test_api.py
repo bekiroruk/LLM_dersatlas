@@ -139,6 +139,51 @@ class APITests(unittest.TestCase):
         self.assertEqual(result["outcome"], "invalid_citations")
         self.assertNotIn("Test yanıtı", result["answer"])
 
+    def test_visible_citation_wins_over_malformed_model_metadata(self):
+        self.ready_document()
+        response = {"role": "assistant", "content": json.dumps({
+            "answer": "Tanzimat Fermanı 1839 yılında ilan edildi. [K1]",
+            "source_ids": ["[K1, K99]"],
+            "insufficient_evidence": False,
+        })}
+        with patch.object(self.model, "chat", return_value=response):
+            result = self.ask().json()
+        self.assertEqual(result["outcome"], "answered")
+        self.assertEqual(result["answer"].count("[K1]"), 1)
+        self.assertNotIn("K99", result["answer"])
+        self.assertEqual(
+            [source["source_id"] for source in result["sources"]],
+            ["K1"],
+        )
+        self.assertTrue(any(
+            step["tool"] == "citation_metadata_normalized"
+            for step in result["trace"]
+        ))
+
+    def test_parenthesized_visible_citation_is_normalized(self):
+        self.ready_document()
+        response = {"role": "assistant", "content": json.dumps({
+            "answer": "Tanzimat Fermanı 1839 yılında ilan edildi. (K1)",
+            "source_ids": ["1"],
+            "insufficient_evidence": False,
+        })}
+        with patch.object(self.model, "chat", return_value=response):
+            result = self.ask().json()
+        self.assertEqual(result["outcome"], "answered")
+        self.assertTrue(result["answer"].endswith("[K1]"))
+
+    def test_unknown_visible_citation_is_never_repaired(self):
+        self.ready_document()
+        response = {"role": "assistant", "content": json.dumps({
+            "answer": "Tanzimat Fermanı 1839 yılında ilan edildi. [K99]",
+            "source_ids": ["K1"],
+            "insufficient_evidence": False,
+        })}
+        with patch.object(self.model, "chat", return_value=response):
+            result = self.ask().json()
+        self.assertEqual(result["outcome"], "invalid_citations")
+        self.assertNotIn("1839", result["answer"])
+
     def test_model_failure(self):
         self.ready_document(); self.model.unavailable = True
         self.assertEqual(self.ask().status_code, 503)

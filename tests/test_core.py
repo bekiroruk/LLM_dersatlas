@@ -5,7 +5,12 @@ from app.ranking import tokenize, bm25, reciprocal_rank_fusion
 from app.passwords import hash_password, check_password, token_hash
 from app.citations import valid_citations
 from app.ingestion import Section, DocumentError, chunk_sections, extract_document, clean_text
-from app.rag import _focused_vegetation_evidence, _retrieval_queries
+from app.rag import (
+    _declared_source_ids,
+    _focused_vegetation_evidence,
+    _normalize_citation_shapes,
+    _retrieval_queries,
+)
 from pypdf import PdfWriter
 from docx import Document as WordDocument
 
@@ -144,6 +149,16 @@ Relikt Karadeniz'de kızılçam; Akdeniz'de kayın."""
 
     def test_metadata_citation_mismatch(self):
         self.assertFalse(valid_citations("Cevap. [K1]", ["K2"], ["K1", "K2"]))
+
+    def test_common_local_model_citation_shapes_are_normalized(self):
+        self.assertEqual(
+            _normalize_citation_shapes("Cevap. (K1) [K2, K3] 【K4】"),
+            "Cevap. [K1] [K2] [K3] [K4]",
+        )
+        self.assertEqual(
+            _declared_source_ids(["[K1, K2]", "K3 ve K4"]),
+            ({"K1", "K2", "K3", "K4"}, False),
+        )
 
 
 if __name__ == "__main__":
