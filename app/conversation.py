@@ -125,6 +125,33 @@ def _explicit_follow_up(question, previous):
     return candidate if len(candidate) <= 1200 else None
 
 
+def _explicit_pair_comparison(question):
+    """İki konusu da yazılmış karşılaştırma geçmişe bağlı değildir."""
+    plain = question.strip().strip('“”"').strip()
+    folded = _fold(plain)
+    if re.search(
+        r"\b(?:bu|şu|o|bunu|şunu|onu|bunlar|şunlar|onlar|"
+        r"önceki|sonraki|aynı)\b",
+        folded,
+    ):
+        return False
+    coordinators = list(re.finditer(r"\b(?:ve|ile)\b", folded))
+    if len(coordinators) != 1:
+        return False
+    comparison = re.search(
+        r"\b(?:karsilastir\w*|kiyasla\w*|fark\w*|benzer\w*|ortak\w*)\b",
+        folded,
+    )
+    if not comparison:
+        return False
+    coordinator = coordinators[0]
+    # Bağlacın iki yanında da açık bir konu bulunmalı. Sadece "bu iki"
+    # benzeri bir gönderme bu kısa yoldan geçemez.
+    left = re.findall(r"\w+", folded[:coordinator.start()])
+    right = re.findall(r"\w+", folded[coordinator.end():comparison.start()])
+    return bool(left and right)
+
+
 def resolve_question(model, question, history, subject_id):
     """History resolves references only. No history is passed to the answer LLM."""
     if not history:
@@ -147,6 +174,18 @@ def resolve_question(model, question, history, subject_id):
         eligible.pop(0)
     if not eligible:
         return ResolvedQuestion(question)
+
+    if _explicit_pair_comparison(question):
+        return ResolvedQuestion(
+            question,
+            trace=({
+                "tool": "conversation_context",
+                "found": len(eligible),
+                "status": "standalone",
+                "method": "explicit_pair",
+                "query": question,
+            },),
+        )
 
     last = eligible[-1]
     explicit = _explicit_follow_up(question, last.resolved_question or last.question)

@@ -535,6 +535,44 @@ class APITests(unittest.TestCase):
         self.assertFalse(result["context_used"])
         self.assertEqual(result["outcome"], "insufficient")
 
+    def test_explicit_comparison_after_two_questions_skips_context_rewrite(self):
+        geography = self.owned_subject()
+        doc_id = self.ready_in(
+            geography,
+            "Flora bölgesi Türkiye'de yayılışı Baskın görünüm\n"
+            "Avrupa-Sibirya Karadeniz kıyı kuşağı Nemli ormanlar\n"
+            "Akdeniz Akdeniz iklim sahaları Kızılçam, maki",
+        )
+        question = "Karadeniz ve Akdeniz iklimlerinin doğal bitki örtülerini karşılaştır."
+        history = [
+            {"question": "Karadeniz ikliminin doğal bitki örtüsü nedir?", "answer": "Nemli ormanlardır. [K1]"},
+            {"question": "Akdeniz ikliminin doğal bitki örtüsü nedir?", "answer": "Kızılçam ve makidir. [K1]"},
+        ]
+        grounded = {"role": "assistant", "content": json.dumps({
+            "answer": "Karadeniz ikliminde nemli ormanlar; Akdeniz ikliminde kızılçam ve maki görülür. [K1]",
+            "source_ids": ["K1"], "insufficient_evidence": False,
+        })}
+        original = self.model.chat
+
+        def no_context_rewrite(messages, tools=None, schema=None):
+            if schema and schema.get("title") == "ContextRewrite":
+                raise AssertionError("Açık karşılaştırma bağlam modeline gönderilmemeli")
+            if schema and schema.get("title") == "AnswerPayload":
+                return grounded
+            return original(messages, tools=tools, schema=schema)
+
+        with patch.object(self.model, "chat", side_effect=no_context_rewrite):
+            result = self.client.post(
+                "/api/questions",
+                json={"question": question, "mode": "rag", "history": history},
+                headers=self.headers,
+            ).json()
+        self.assertEqual(result["outcome"], "answered")
+        self.assertEqual(result["resolved_question"], question)
+        self.assertFalse(result["context_used"])
+        self.assertEqual(result["trace"][0]["method"], "explicit_pair")
+        self.assertEqual({source["document_id"] for source in result["sources"]}, {doc_id})
+
     def test_context_resolution_failure_clarifies_without_search_or_draft(self):
         self.ready_document()
         with patch.object(self.model, "chat", return_value={"content": "malformed"}) as chat, patch.object(self.app.state.rag, "retrieve", side_effect=AssertionError("Belirsiz soruda arama yapılmamalı")):

@@ -59,6 +59,35 @@ class ConversationTests(unittest.TestCase):
         self.assertFalse(result.used)
         self.assertEqual(result.trace[0]["status"], "standalone")
 
+    def test_explicit_pair_comparison_never_depends_on_history_model(self):
+        class NoRewrite:
+            def chat(self, *args, **kwargs):
+                raise AssertionError("Açık karşılaştırma bağlam modeline gönderilmemeli")
+
+        questions = (
+            "Karadeniz ve Akdeniz iklimlerinin doğal bitki örtülerini karşılaştır.",
+            "Karadeniz ve Akdeniz iklimlerinin bitki örtüsü nasıl farklıdır?",
+            "Tanzimat Fermanı ile Islahat Fermanı arasındaki temel farklar nelerdir?",
+        )
+        history = [
+            turn(question="Karadeniz ikliminin doğal bitki örtüsü nedir?"),
+            turn(question="Akdeniz ikliminin doğal bitki örtüsü nedir?"),
+        ]
+        for question in questions:
+            with self.subTest(question=question):
+                result = resolve_question(NoRewrite(), question, history, None)
+                self.assertEqual(result.question, question)
+                self.assertFalse(result.used)
+                self.assertFalse(result.unresolved)
+                self.assertEqual(result.trace[0]["method"], "explicit_pair")
+
+    def test_reference_word_prevents_explicit_pair_shortcut(self):
+        question = "Karadeniz ve Akdeniz açısından bu iki iklim nasıl farklı?"
+        model = RewriteModel(unresolved=True)
+        result = resolve_question(model, question, [turn()], None)
+        self.assertTrue(result.unresolved)
+        self.assertEqual(len(model.calls), 1)
+
     def test_scope_change_does_not_use_previous_course_history(self):
         for old_scope, new_scope in ((None, HISTORY), (HISTORY, None), (GEOGRAPHY, HISTORY)):
             with self.subTest(old=old_scope, new=new_scope):
