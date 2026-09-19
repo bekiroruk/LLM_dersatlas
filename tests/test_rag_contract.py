@@ -251,6 +251,42 @@ class RagContractTests(unittest.TestCase):
         self.assertEqual(result["outcome"], "insufficient")
         self.assertEqual(model.calls, [])
 
+    def test_mixed_question_fallback_quotes_every_requested_aspect(self):
+        question = (
+            "Karadeniz ve Akdeniz iklimlerini yağış rejimleri ve doğal "
+            "bitki örtüleri bakımından karşılaştır."
+        )
+        rainfall = source(
+            "rainfall",
+            "Karadeniz ikliminde yağış yıl boyunca düzenlidir. "
+            "Akdeniz ikliminde yağış düzensizdir ve yaz kuraklığı görülür.",
+        )
+        result, _ = self.run_question(
+            question,
+            sources=[rainfall, source("plants", TABLE)],
+            responses=[payload("Geçersiz model yanıtı. [K99]", ["K99"])],
+        )
+        self.assertEqual(result["outcome"], "answered")
+        self.assertEqual(result["answer_method"], "source_excerpt")
+        self.assertIn("yağış yıl boyunca düzenlidir", result["answer"])
+        self.assertIn("yağış düzensizdir", result["answer"])
+        self.assertIn("Nemli ormanlar", result["answer"])
+        self.assertIn("Kızılçam, maki", result["answer"])
+        self.assertEqual(
+            {item["chunk_id"] for item in result["sources"]},
+            {"rainfall", "plants"},
+        )
+
+    def test_drought_resistant_plants_are_not_rainfall_evidence(self):
+        question = (
+            "Karadeniz ve Akdeniz iklimlerini yağış rejimleri ve doğal "
+            "bitki örtüleri bakımından karşılaştır."
+        )
+        plants = TABLE + "\nAkdeniz türleri kuraklığa dayanıklıdır."
+        result, model = self.run_question(question, sources=[source("plants", plants)])
+        self.assertEqual(result["outcome"], "insufficient")
+        self.assertEqual(model.calls, [])
+
 
 if __name__ == "__main__":
     unittest.main()

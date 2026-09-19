@@ -16,7 +16,7 @@ from .ranking import bm25, reciprocal_rank_fusion
 from .security import search_subject_ids
 
 
-RAG_REVISION = "2026-09-19-source-contract-v6"
+RAG_REVISION = "2026-09-19-source-contract-v7"
 
 
 NO_EVIDENCE = (
@@ -550,30 +550,91 @@ def _requested_climate_aspects(question):
     return aspects
 
 
+CLIMATE_ASPECT_EVIDENCE_PATTERNS = {
+    "precipitation": (
+        r"\b(?:yagis\w*|yaz\w*(?:\s+\w+){0,3}\s+kurak\w*|"
+        r"kurak\s+mevsim\w*)\b"
+    ),
+    "temperature": r"\b(?:sicaklik\w*|sicak\w*|soguk\w*|ilik\w*|derece\w*)\b",
+    "humidity": (
+        r"\b(?:nemlilik\w*|(?:bagil|mutlak)\s+nem\w*|"
+        r"nem\w*\s+(?:oran\w*|fazla\w*|az\w*|yuksek\w*|dusuk\w*))\b"
+    ),
+    "wind": r"\bruzgar\w*\b",
+    "pressure": r"\bbasinc\w*\b",
+}
+
+
+def _focused_climate_aspect_evidence(question, text, aspect):
+    """Bir iklim boyutunu her karşılaştırma tarafıyla aynı bölümde bulur."""
+    subjects = _vegetation_subjects(question)
+    pattern = CLIMATE_ASPECT_EVIDENCE_PATTERNS.get(aspect)
+    if not subjects or not pattern:
+        return None
+
+    lines = _source_units(text)
+    relations = {}
+
+    for subject in subjects:
+        candidates = []
+
+        for index, line in enumerate(lines):
+            if not _term_in_tokens(subject, _tokens(line)):
+                continue
+
+            body_parts = []
+            for end in range(index, min(index + 6, len(lines))):
+                current_tokens = _tokens(lines[end])
+                if end > index and any(
+                    other != subject and _term_in_tokens(other, current_tokens)
+                    for other in subjects
+                ):
+                    break
+
+                climate = re.search(
+                    r"\b([a-z0-9]+)\s+iklim\w*",
+                    _normalize_text(lines[end]),
+                )
+                if end > index and climate and not _same_term(subject, climate.group(1)):
+                    break
+
+                body_parts.append(lines[end])
+                body = " ".join(body_parts).strip()
+                if re.search(pattern, _normalize_text(body)):
+                    explicit_climate = int(bool(re.search(
+                        r"\b" + re.escape(subject) + r"\w*\s+iklim\w*\b",
+                        _normalize_text(body),
+                    )))
+                    candidates.append((-explicit_climate, len(body), body))
+                    break
+
+        if candidates:
+            relations[subject] = min(candidates)[2]
+
+    if not relations:
+        return None
+
+    return {
+        "covered": tuple(relations),
+        "relations": relations,
+    }
+
+
 def _climate_aspect_subjects(question, sources, aspect):
     """İstenen iklim boyutunu açıkça taşıyan karşılaştırma taraflarını bulur."""
-    patterns = {
-        "precipitation": r"\b(?:yagis\w*|kurak\w*)\b",
-        "temperature": r"\b(?:sicaklik\w*|sicak\w*|soguk\w*|ilik\w*|derece\w*)\b",
-        "humidity": r"\bnem\w*\b",
-        "wind": r"\bruzgar\w*\b",
-        "pressure": r"\bbasinc\w*\b",
-    }
-    pattern = patterns[aspect]
-    subjects = _vegetation_subjects(question)
     covered = []
 
     for source in sources[:10]:
-        for unit in _evidence_units(source.get("text", "")):
-            normalized = _normalize_text(unit)
-            if not re.search(pattern, normalized):
-                continue
-            tokens = _tokens(unit)
-            for subject in subjects:
-                if _term_in_tokens(subject, tokens) and not any(
-                    _same_term(subject, known) for known in covered
-                ):
-                    covered.append(subject)
+        focus = _focused_climate_aspect_evidence(
+            question,
+            source.get("text", ""),
+            aspect,
+        )
+        if not focus:
+            continue
+        for subject in focus["covered"]:
+            if not any(_same_term(subject, known) for known in covered):
+                covered.append(subject)
 
     return covered
 
@@ -970,27 +1031,49 @@ def _answer_references(payload, allowed_ids):
 
 
 def _focused_excerpt_result(question, sources, trace):
-    """Açık konu-değer satırları varsa modelden bağımsız, etiketli alıntı."""
+    """İstenen tüm açık konu-değer satırlarını etiketli alıntı olarak döndürür."""
     subjects = _vegetation_subjects(question)
     if not subjects:
         return None
-    rows = {}
+    vegetation_rows = {}
     for source in sources:
         focus = _focused_vegetation_evidence(question, source["text"])
         if focus:
             for subject, row in focus["relations"].items():
-                rows.setdefault(subject, (_strip_citations(row), source))
-    if not all(subject in rows for subject in subjects):
+                vegetation_rows.setdefault(subject, (_strip_citations(row), source))
+    if not all(subject in vegetation_rows for subject in subjects):
         return None
+
+    aspect_rows = {}
+    aspects = _requested_climate_aspects(question)
+    for aspect in aspects:
+        rows = {}
+        for source in sources:
+            focus = _focused_climate_aspect_evidence(
+                question,
+                source["text"],
+                aspect,
+            )
+            if focus:
+                for subject, row in focus["relations"].items():
+                    rows.setdefault(subject, (_strip_citations(row), source))
+        if not all(subject in rows for subject in subjects):
+            # Birden fazla özellik istenmişse yalnızca bitki satırlarını
+            # göstererek soruyu cevaplanmış gibi işaretleme.
+            return None
+        aspect_rows[aspect] = rows
+
     parts, selected, seen = [], [], set()
     for subject in subjects:
-        row, source = rows[subject]
-        key = (source["source_id"], row)
-        if key not in seen:
-            parts.append(f"• {row} [{source['source_id']}]")
-            seen.add(key)
-        if source["source_id"] not in {item["source_id"] for item in selected}:
-            selected.append(source)
+        ordered_rows = [aspect_rows[aspect][subject] for aspect in aspects]
+        ordered_rows.append(vegetation_rows[subject])
+        for row, source in ordered_rows:
+            key = (source["source_id"], row)
+            if key not in seen:
+                parts.append(f"• {row} [{source['source_id']}]")
+                seen.add(key)
+            if source["source_id"] not in {item["source_id"] for item in selected}:
+                selected.append(source)
     trace.append({"tool": "focused_source_excerpt", "found": len(selected)})
     return {
         "answer": "Notlarındaki ilgili kaynak satırları:\n" + "\n".join(parts),
