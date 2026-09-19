@@ -3,6 +3,7 @@ import math
 import re
 import unicodedata
 from difflib import SequenceMatcher
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from sqlalchemy import select
@@ -15,7 +16,7 @@ from .ranking import bm25, reciprocal_rank_fusion
 from .security import search_subject_ids
 
 
-RAG_REVISION = "2026-09-19-source-contract-v2"
+RAG_REVISION = "2026-09-19-source-contract-v3"
 
 
 NO_EVIDENCE = (
@@ -1490,6 +1491,40 @@ class AnswerPayload(BaseModel):
     insufficient_evidence: bool
 
 
+class SourcedAnswerPayload(AnswerPayload):
+    answer: str = Field(min_length=1, max_length=12000)
+    source_ids: list[str] = Field(min_length=1, max_length=10)
+    insufficient_evidence: Literal[False]
+
+
+class InsufficientAnswerPayload(AnswerPayload):
+    answer: Literal[""]
+    source_ids: list[str] = Field(max_length=0)
+    insufficient_evidence: Literal[True]
+
+
+def _answer_schema(allowed_source_ids=None):
+    """Cevap varsa kaynak zorunlu; kanıt yoksa boş cevap serbest.
+
+    Ollama/llama.cpp dönüştürücüsünün desteklediği iki tam anyOf dalı
+    kullanılır. Aynı düzeyde properties veya if/then koşulu kullanılmaz.
+    """
+    answered = SourcedAnswerPayload.model_json_schema()
+    insufficient = InsufficientAnswerPayload.model_json_schema()
+    if allowed_source_ids is not None:
+        allowed_source_ids = list(dict.fromkeys(allowed_source_ids))
+        if not allowed_source_ids:
+            return {**insufficient, "title": "AnswerPayload"}
+        answered["properties"]["source_ids"]["items"]["enum"] = allowed_source_ids
+
+    # Önce yeterliliğe, sonra kaynaklara karar ver; cevabı bundan sonra yaz.
+    for branch in (answered, insufficient):
+        order = ["insufficient_evidence", "source_ids", "answer"]
+        branch["properties"] = {key: branch["properties"][key] for key in order}
+        branch["required"] = order
+    return {"title": "AnswerPayload", "anyOf": [answered, insufficient]}
+
+
 class SearchArguments(BaseModel):
     model_config = ConfigDict(
         extra="forbid"
@@ -1826,13 +1861,19 @@ class RAGService:
         allowed_source_ids=None,
         retry_format=True,
     ):
-        schema = AnswerPayload.model_json_schema()
+        schema = _answer_schema(allowed_source_ids)
         if allowed_source_ids is not None:
-            schema["properties"]["source_ids"]["items"]["enum"] = list(allowed_source_ids)
             system += (
                 " İzinli kaynak numaraları: " + ", ".join(allowed_source_ids)
                 + ". source_ids için yalnızca bu numaraları kullan."
             )
+        system += (
+            " Cevap veriyorsan insufficient_evidence=false ve source_ids en az "
+            "bir kullanılan kaynak numarası içermeli. Kanıt yetersizse "
+            "insufficient_evidence=true, source_ids=[], answer=\"\" döndür. "
+            "Aşağıdaki şemayı cevap olarak kopyalama; bu şemaya uygun bir JSON nesnesi üret."
+            "\nÇIKTI ŞEMASI:\n" + json.dumps(schema, ensure_ascii=False)
+        )
         message = self.model.chat(
             [
                 {

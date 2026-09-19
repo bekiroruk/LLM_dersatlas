@@ -3,8 +3,14 @@ import json
 import unittest
 from unittest.mock import patch
 
+from pydantic import TypeAdapter, ValidationError
+
 from app.config import Settings
-from app.rag import RAGService, _vegetation_subjects, _focused_vegetation_evidence, _answer_references, AnswerPayload
+from app.rag import (
+    RAGService, _vegetation_subjects, _focused_vegetation_evidence,
+    _answer_references, _answer_schema, AnswerPayload,
+    SourcedAnswerPayload, InsufficientAnswerPayload,
+)
 
 
 TABLE = (
@@ -82,7 +88,47 @@ class RagContractTests(unittest.TestCase):
     def test_model_schema_restricts_ids_to_the_actual_context(self):
         _, model = self.run_question()
         for _, schema in model.calls:
-            self.assertEqual(schema["properties"]["source_ids"]["items"]["enum"], ["K1"])
+            answered, insufficient = schema["anyOf"]
+            self.assertEqual(answered["properties"]["source_ids"]["items"]["enum"], ["K1"])
+            self.assertEqual(answered["properties"]["source_ids"]["minItems"], 1)
+            self.assertIs(answered["properties"]["insufficient_evidence"]["const"], False)
+            self.assertIs(insufficient["properties"]["insufficient_evidence"]["const"], True)
+            self.assertEqual(insufficient["properties"]["source_ids"]["maxItems"], 0)
+            self.assertNotIn("properties", schema, "Ollama birleşik şemada anyOf'u atlamamalı")
+
+    def test_answer_and_abstention_contracts_reject_inconsistent_outputs(self):
+        contract = TypeAdapter(SourcedAnswerPayload | InsufficientAnswerPayload)
+        for answer, ids, insufficient in (
+            ("Ormanlar.", [], False),
+            ("", [], False),
+            ("", ["K1"], False),
+            ("Ormanlar.", [], True),
+            ("", ["K1"], True),
+        ):
+            with self.subTest(answer=answer, ids=ids, insufficient=insufficient):
+                with self.assertRaises(ValidationError):
+                    contract.validate_python({"answer": answer, "source_ids": ids, "insufficient_evidence": insufficient})
+        contract.validate_python({"answer": "Ormanlar. [K1]", "source_ids": ["K1"], "insufficient_evidence": False})
+        contract.validate_python({"answer": "", "source_ids": [], "insufficient_evidence": True})
+
+    def test_no_allowed_sources_leaves_only_abstention_branch(self):
+        schema = _answer_schema([])
+        self.assertNotIn("anyOf", schema)
+        self.assertIs(schema["properties"]["insufficient_evidence"]["const"], True)
+        self.assertEqual(schema["properties"]["answer"]["const"], "")
+
+    def test_prompt_contains_the_same_schema_used_for_decoding_including_retry(self):
+        _, model = self.run_question(responses=[{"content": "not-json"}])
+        for messages, schema in model.calls:
+            self.assertIn(json.dumps(schema, ensure_ascii=False), messages[0]["content"])
+            self.assertNotIn("not-json", messages[0]["content"])
+
+    def test_model_ignoring_schema_cannot_pass_with_empty_source_ids(self):
+        result, model = self.run_question(responses=[payload("KAYNAKSIZ_MODEL_CEVABI", [])])
+        self.assertEqual(result["answer_method"], "source_excerpt")
+        self.assertNotIn("KAYNAKSIZ_MODEL_CEVABI", result["answer"])
+        self.assertEqual(len(model.calls), 3)
+        self.assertTrue(any(t.get("reason") == "missing_source_ids" for t in result["trace"]))
 
     def test_invalid_ids_trigger_one_bounded_regeneration(self):
         result, model = self.run_question(responses=[payload(), payload(ids=["invalid"] ,answer="Ormanlar. [K99]"), payload()])
@@ -133,7 +179,7 @@ class RagContractTests(unittest.TestCase):
         self.assertNotIn("PRIVATE_MODEL_TEXT", json.dumps(result, ensure_ascii=False))
         self.assertEqual(len(model.calls), 3)
         for _, schema in model.calls:
-            self.assertEqual(schema["properties"]["source_ids"]["items"]["enum"], ["K1"])
+            self.assertEqual(schema["anyOf"][0]["properties"]["source_ids"]["items"]["enum"], ["K1"])
 
     def test_json_failure_returns_exact_evidence_without_unbounded_retries(self):
         result, model = self.run_question(responses=[{"content": "not-json"}])
