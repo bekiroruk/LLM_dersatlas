@@ -573,6 +573,58 @@ class APITests(unittest.TestCase):
         self.assertEqual(result["trace"][0]["method"], "explicit_pair")
         self.assertEqual({source["document_id"] for source in result["sources"]}, {doc_id})
 
+    def test_explicit_multi_aspect_comparison_with_history_stays_standalone(self):
+        geography = self.owned_subject()
+        doc_id = self.ready_in(
+            geography,
+            "Karadeniz ikliminde yağış yıl boyunca düzenlidir. "
+            "Akdeniz ikliminde yağış düzensizdir ve yaz kuraklığı görülür.\n"
+            "Flora bölgesi Türkiye'de yayılışı Baskın görünüm\n"
+            "Avrupa-Sibirya Karadeniz kıyı kuşağı Nemli ormanlar\n"
+            "Akdeniz Akdeniz iklim sahaları Kızılçam, maki",
+        )
+        question = (
+            "Karadeniz ve Akdeniz iklimlerini yağış rejimleri ve doğal "
+            "bitki örtüleri bakımından karşılaştır."
+        )
+        grounded = {"role": "assistant", "content": json.dumps({
+            "answer": (
+                "Karadeniz ikliminde yağış yıl boyunca düzenlidir ve nemli "
+                "ormanlar görülür; Akdeniz ikliminde yağış düzensizdir, yaz "
+                "kuraklığı ile kızılçam ve maki görülür. [K1]"
+            ),
+            "source_ids": ["K1"],
+            "insufficient_evidence": False,
+        })}
+        original = self.model.chat
+
+        def no_context_rewrite(messages, tools=None, schema=None):
+            if schema and schema.get("title") == "ContextRewrite":
+                raise AssertionError("Açık bağımsız soru bağlam modeline gönderilmemeli")
+            if schema and schema.get("title") == "AnswerPayload":
+                return grounded
+            return original(messages, tools=tools, schema=schema)
+
+        with patch.object(self.model, "chat", side_effect=no_context_rewrite):
+            result = self.client.post(
+                "/api/questions",
+                json={
+                    "question": question,
+                    "mode": "rag",
+                    "history": [
+                        {"question": "Karadeniz ikliminin doğal bitki örtüsü nedir?", "answer": "Nemli ormanlardır. [K1]"},
+                        {"question": "Akdeniz ikliminin doğal bitki örtüsü nedir?", "answer": "Kızılçam ve makidir. [K1]"},
+                    ],
+                },
+                headers=self.headers,
+            ).json()
+
+        self.assertEqual(result["outcome"], "answered")
+        self.assertEqual(result["resolved_question"], question)
+        self.assertFalse(result["context_used"])
+        self.assertEqual(result["trace"][0]["method"], "no_reference")
+        self.assertEqual({source["document_id"] for source in result["sources"]}, {doc_id})
+
     def test_exact_climate_follow_up_after_detailed_comparison_is_resolved(self):
         geography = self.owned_subject()
         doc_id = self.ready_in(

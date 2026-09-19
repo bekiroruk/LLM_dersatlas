@@ -16,7 +16,7 @@ from .ranking import bm25, reciprocal_rank_fusion
 from .security import search_subject_ids
 
 
-RAG_REVISION = "2026-09-19-source-contract-v5"
+RAG_REVISION = "2026-09-19-source-contract-v6"
 
 
 NO_EVIDENCE = (
@@ -533,6 +533,51 @@ def _asks_about_vegetation(question):
     ))
 
 
+def _requested_climate_aspects(question):
+    """Bitki örtüsüne ek olarak açıkça istenen iklim boyutlarını döndürür."""
+    normalized = _normalize_text(question)
+    aspects = []
+    patterns = (
+        ("precipitation", r"\b(?:yagis\w*|kuraklik\w*)\b"),
+        ("temperature", r"\b(?:sicaklik\w*|sicak\w*|soguk\w*|ilik\w*)\b"),
+        ("humidity", r"\bnem(?:lilik)?\w*\b"),
+        ("wind", r"\bruzgar\w*\b"),
+        ("pressure", r"\bbasinc\w*\b"),
+    )
+    for name, pattern in patterns:
+        if re.search(pattern, normalized):
+            aspects.append(name)
+    return aspects
+
+
+def _climate_aspect_subjects(question, sources, aspect):
+    """İstenen iklim boyutunu açıkça taşıyan karşılaştırma taraflarını bulur."""
+    patterns = {
+        "precipitation": r"\b(?:yagis\w*|kurak\w*)\b",
+        "temperature": r"\b(?:sicaklik\w*|sicak\w*|soguk\w*|ilik\w*|derece\w*)\b",
+        "humidity": r"\bnem\w*\b",
+        "wind": r"\bruzgar\w*\b",
+        "pressure": r"\bbasinc\w*\b",
+    }
+    pattern = patterns[aspect]
+    subjects = _vegetation_subjects(question)
+    covered = []
+
+    for source in sources[:10]:
+        for unit in _evidence_units(source.get("text", "")):
+            normalized = _normalize_text(unit)
+            if not re.search(pattern, normalized):
+                continue
+            tokens = _tokens(unit)
+            for subject in subjects:
+                if _term_in_tokens(subject, tokens) and not any(
+                    _same_term(subject, known) for known in covered
+                ):
+                    covered.append(subject)
+
+    return covered
+
+
 def _vegetation_search_queries(question):
     """PDF tablo başlıklarında kullanılan eş anlamlı alanları da arar."""
     if not _asks_about_vegetation(question):
@@ -759,10 +804,25 @@ def _sources_are_relevant(question, sources):
                 if not any(_same_term(subject, known) for known in covered):
                     covered.append(subject)
 
-        return all(
+        vegetation_complete = all(
             any(_same_term(subject, known) for known in covered)
             for subject in vegetation_subjects
         )
+        if not vegetation_complete:
+            return False
+
+        # Karma bir soruda bitki tablosunun bulunması tek başına yeterli
+        # değildir; yağış/sıcaklık gibi her ek boyut iki taraf için de açıkça
+        # kaynakta yer almalıdır.
+        for aspect in _requested_climate_aspects(question):
+            aspect_covered = _climate_aspect_subjects(question, sources, aspect)
+            if not all(
+                any(_same_term(subject, known) for known in aspect_covered)
+                for subject in vegetation_subjects
+            ):
+                return False
+
+        return True
 
     if len(anchors) <= 2:
         required = len(anchors)
@@ -2158,7 +2218,7 @@ class RAGService:
         ]
 
         vegetation_subjects = _vegetation_subjects(question)
-        if vegetation_subjects:
+        if vegetation_subjects and not _requested_climate_aspects(question):
             focused = []
 
             for source in sources:

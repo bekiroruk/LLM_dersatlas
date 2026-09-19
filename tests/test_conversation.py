@@ -58,6 +58,33 @@ class ConversationTests(unittest.TestCase):
         self.assertEqual(result.question, question)
         self.assertFalse(result.used)
         self.assertEqual(result.trace[0]["status"], "standalone")
+        self.assertEqual(result.trace[0]["method"], "no_reference")
+        self.assertEqual(model.calls, [])
+
+    def test_explicit_multi_aspect_comparison_is_never_treated_as_follow_up(self):
+        class NoRewrite:
+            def chat(self, *args, **kwargs):
+                raise AssertionError("Açık bağımsız soru bağlam modeline gönderilmemeli")
+
+        question = (
+            "Karadeniz ve Akdeniz iklimlerini yağış rejimleri ve doğal "
+            "bitki örtüleri bakımından karşılaştır."
+        )
+        result = resolve_question(NoRewrite(), question, [turn()], None)
+        self.assertEqual(result.question, question)
+        self.assertFalse(result.used)
+        self.assertFalse(result.unresolved)
+        self.assertEqual(result.trace[0]["method"], "no_reference")
+
+    def test_water_word_is_not_mistaken_for_turkish_demonstrative(self):
+        class NoRewrite:
+            def chat(self, *args, **kwargs):
+                raise AssertionError("'Su' sözcüğü 'şu' zamiri değildir")
+
+        question = "Su döngüsü nasıl oluşur?"
+        result = resolve_question(NoRewrite(), question, [turn()], None)
+        self.assertEqual(result.question, question)
+        self.assertEqual(result.trace[0]["method"], "no_reference")
 
     def test_explicit_pair_comparison_never_depends_on_history_model(self):
         class NoRewrite:

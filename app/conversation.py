@@ -180,6 +180,42 @@ def _explicit_pair_comparison(question):
     return bool(left and right)
 
 
+def _has_context_reference(question):
+    """Yalnızca önceki tura gönderme ihtimali olan soruları işaretler."""
+    plain = unicodedata.normalize("NFKC", str(question)).casefold().strip()
+    folded = _fold(question).strip()
+
+    # Açık zamirler ve konuşma içi konum ifadeleri geçmişe bağlı olabilir.
+    if re.search(
+        r"\b(?:bu|bunu|buna|bunun|bunda|bundan|bunlar\w*|"
+        r"şu|şunu|şuna|şunun|şunda|şundan|şunlar\w*|"
+        r"o|onu|ona|onun|onda|ondan|onlar\w*|"
+        r"ikisi\w*|her\s+ikisi)\b",
+        plain,
+    ):
+        return True
+    if re.search(
+        r"\b(?:onceki|sonraki|yukaridaki|asagidaki|ayni|diger\w*|"
+        r"az\s+once)\b",
+        folded,
+    ):
+        return True
+
+    # Bunlar çoğunlukla yeni bir konu değil, önceki cevaba devam isteğidir.
+    if re.match(r"^(?:peki\b|devam\b|biraz\s+daha\b|daha\s+(?:kisa|ayrintili)\b)", folded):
+        return True
+    if re.fullmatch(
+        r"(?:neden|nicin|ne\s+zaman|kim|hangisi|nasil|aciklar\s+misin|"
+        r"ozetler\s+misin|kisalt(?:ir\s+misin)?)\s*[?.!]*",
+        folded,
+    ):
+        return True
+    if re.search(r"\b(?:aralarindaki|birincisi|ikincisi|ucuncusu)\b", folded):
+        return True
+
+    return False
+
+
 def resolve_question(model, question, history, subject_id):
     """History resolves references only. No history is passed to the answer LLM."""
     if not history:
@@ -220,6 +256,20 @@ def resolve_question(model, question, history, subject_id):
     if explicit:
         return ResolvedQuestion(explicit, used=True, trace=({"tool": "conversation_context",
             "found": len(eligible), "status": "resolved", "method": "explicit_reference", "query": explicit},))
+
+    # Geçmiş yalnızca gönderme çözmek içindir. Açık bir gönderme yoksa küçük
+    # modelin bağımsız soruyu yanlışlıkla takip sorusu saymasına izin verme.
+    if not _has_context_reference(question):
+        return ResolvedQuestion(
+            question,
+            trace=({
+                "tool": "conversation_context",
+                "found": len(eligible),
+                "status": "standalone",
+                "method": "no_reference",
+                "query": question,
+            },),
+        )
 
     # Old citations can never refer to a source in the new request.
     data = [

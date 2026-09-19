@@ -216,6 +216,41 @@ class RagContractTests(unittest.TestCase):
         self.assertEqual(result["outcome"], "answered")
         self.assertIn("yazlar yağışlıdır", " ".join(s["text"] for s in self.context(model)))
 
+    def test_mixed_rainfall_and_vegetation_keeps_both_evidence_types(self):
+        question = (
+            "Karadeniz ve Akdeniz iklimlerini yağış rejimleri ve doğal "
+            "bitki örtüleri bakımından karşılaştır."
+        )
+        rainfall = source(
+            "rainfall",
+            "Karadeniz ikliminde yağış yıl boyunca düzenlidir. "
+            "Akdeniz ikliminde yağış düzensizdir ve yaz kuraklığı görülür.",
+        )
+        answer = (
+            "Karadeniz ikliminde yağış yıl boyunca düzenlidir ve nemli "
+            "ormanlar görülür; Akdeniz ikliminde yağış düzensizdir, yaz "
+            "kuraklığı ile kızılçam ve maki görülür. [K1] [K2]"
+        )
+        result, model = self.run_question(
+            question,
+            sources=[rainfall, source("plants", TABLE)],
+            responses=[payload(answer, ["K1", "K2"])],
+        )
+        context_text = "\n".join(item["text"] for item in self.context(model))
+        self.assertEqual(result["outcome"], "answered")
+        self.assertIn("yağış yıl boyunca düzenlidir", context_text)
+        self.assertIn("Nemli ormanlar", context_text)
+        self.assertEqual({item["chunk_id"] for item in result["sources"]}, {"rainfall", "plants"})
+
+    def test_mixed_question_rejects_vegetation_only_sources(self):
+        question = (
+            "Karadeniz ve Akdeniz iklimlerini yağış rejimleri ve doğal "
+            "bitki örtüleri bakımından karşılaştır."
+        )
+        result, model = self.run_question(question, sources=[source("plants", TABLE)])
+        self.assertEqual(result["outcome"], "insufficient")
+        self.assertEqual(model.calls, [])
+
 
 if __name__ == "__main__":
     unittest.main()
