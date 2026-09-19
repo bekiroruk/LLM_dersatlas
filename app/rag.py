@@ -16,7 +16,7 @@ from .ranking import bm25, reciprocal_rank_fusion
 from .security import search_subject_ids
 
 
-RAG_REVISION = "2026-09-19-source-contract-v9"
+RAG_REVISION = "2026-09-19-source-contract-v10"
 
 
 NO_EVIDENCE = (
@@ -450,6 +450,25 @@ def _retrieval_queries(question):
     Soru içindeki yanlış bir yılın aramayı yanlış sayfalara
     kilitlemesini engeller.
     """
+    comparison_queries = _comparison_search_queries(question)
+    aspect_specs = _climate_aspect_query_specs(question)
+    vegetation_queries = _vegetation_search_queries(question)
+
+    # Yağış + bitki örtüsü karşılaştırmasında genel sorgu ve
+    # iki uzun kopyası aynı bilgiyi tekrar tekrar gömdürüyordu. Dört
+    # hedefli sorgu iki tarafı ve iki ölçütü eksiksiz kapsar.
+    if (
+        len(comparison_queries) == 2
+        and _asks_about_vegetation(question)
+        and _requested_climate_aspects(question) == ["precipitation"]
+        and len(aspect_specs) == 2
+        and len(vegetation_queries) == 2
+    ):
+        return [
+            *(query for query, _, _ in aspect_specs),
+            *vegetation_queries,
+        ]
+
     queries = [question.strip()]
 
     without_years = YEAR_PATTERN.sub(
@@ -477,21 +496,38 @@ def _retrieval_queries(question):
     ):
         queries.append(without_years)
 
-    for comparison_query in _comparison_search_queries(question):
+    asked_year = YEAR_PATTERN.search(str(question))
+    if (
+        asked_year
+        and re.search(r"\bilan\w*\b", _normalize_text(question))
+        and _question_requests_date(question)
+    ):
+        title = str(question)[:asked_year.start()].strip(
+            " \t,;:–—-?!.\"“”"
+        )
+        title = re.sub(r"^(?:peki|acaba)\s+", "", title, flags=re.I)
+        verification_query = f"{title} ilan tarihi hangi yıl".strip()
+        if title and all(
+            _normalize_text(verification_query) != _normalize_text(known)
+            for known in queries
+        ):
+            queries.append(verification_query)
+
+    for comparison_query in comparison_queries:
         if all(
             _normalize_text(comparison_query) != _normalize_text(known)
             for known in queries
         ):
             queries.append(comparison_query)
 
-    for aspect_query, _, _ in _climate_aspect_query_specs(question):
+    for aspect_query, _, _ in aspect_specs:
         if all(
             _normalize_text(aspect_query) != _normalize_text(known)
             for known in queries
         ):
             queries.append(aspect_query)
 
-    for vegetation_query in _vegetation_search_queries(question):
+    for vegetation_query in vegetation_queries:
         if all(
             _normalize_text(vegetation_query) != _normalize_text(known)
             for known in queries
@@ -503,9 +539,40 @@ def _retrieval_queries(question):
 
 def _comparison_search_queries(question):
     """Açık iki-konulu takip sorusunu iki kanıt aramasına ayırır."""
+    plain = str(question or "").strip().strip(" ?!.")
+
+    # Türkçede "ile" bağlacı ortak isme bitişik yazılabilir:
+    # "Akdeniz iklimiyle Karadeniz iklimini ... kıyasla". Bu, ayrı
+    # yazılan "A ve B iklimlerini" ile aynı iki arama konusudur.
+    attached = re.fullmatch(
+        r"(.+?)\s+(iklim[\w’'\-]*(?:yla|yle))\s+"
+        r"(.+?)\s+(iklim[\w’'\-]*)\s+(.+)",
+        plain,
+        flags=re.IGNORECASE | re.UNICODE,
+    )
+    if attached:
+        left, left_head, right, right_head, request = (
+            part.strip() for part in attached.groups()
+        )
+        left_root = re.sub(r"(?:yla|yle)$", "", _normalize_text(left_head))
+        if (
+            left
+            and right
+            and request
+            and _same_term(left_root, _normalize_text(right_head))
+            and re.search(
+                r"\b(?:karsilastir\w*|kiyasla\w*|fark\w*)\b",
+                _normalize_text(request),
+            )
+        ):
+            return [
+                f"{left} iklimi {request}",
+                f"{right} iklimi {request}",
+            ]
+
     match = re.fullmatch(
         r"(.+?)\s+(?:ve|ile)\s+(.+?)\s+([^\W\d_]+)\s+açısından\s+(.+)",
-        str(question or "").strip().strip(" ?!."),
+        plain,
         flags=re.IGNORECASE | re.UNICODE,
     )
     if not match:
@@ -514,7 +581,7 @@ def _comparison_search_queries(question):
         match = re.fullmatch(
             r"(.+?)(?:\s+iklim\w*)?\s+(?:ve|ile)\s+"
             r"(.+?)\s+(iklim\w*)\s+(.+)",
-            str(question or "").strip().strip(" ?!."),
+            plain,
             flags=re.IGNORECASE | re.UNICODE,
         )
         if not match:
@@ -707,12 +774,25 @@ def _vegetation_search_queries(question):
     if not _asks_about_vegetation(question):
         return []
 
-    bases = _comparison_search_queries(question) or [str(question).strip()]
-    return [
-        f"{base} flora bitki varlığı baskın görünüm"
-        for base in bases
-        if base
-    ]
+    bases = _comparison_search_queries(question)
+    if bases:
+        queries = []
+        for base in bases:
+            head_match = re.match(
+                r"^(.+?\s+iklim\w*)\b",
+                base,
+                flags=re.IGNORECASE | re.UNICODE,
+            )
+            head = head_match.group(1).strip() if head_match else base
+            head = re.sub(r"\biklim\w*$", "iklimi", head, flags=re.IGNORECASE)
+            queries.append(
+                f"{head} doğal bitki örtüsü flora bitki varlığı "
+                "baskın görünüm"
+            )
+        return queries
+
+    base = str(question).strip()
+    return [f"{base} flora bitki varlığı baskın görünüm"] if base else []
 
 
 def _vegetation_subjects(question):
@@ -1234,6 +1314,10 @@ def _structured_comparison_result(question, sources, trace):
     paragraphs = []
     selected = []
     selected_ids = set()
+    one_sentence = bool(re.search(
+        r"\btek\s+cumle\w*\b",
+        _normalize_text(question),
+    ))
 
     for subject in subjects:
         claims = []
@@ -1242,8 +1326,10 @@ def _structured_comparison_result(question, sources, trace):
             phrase = _seasonal_climate_phrase(row, subject, aspect)
             if not phrase:
                 return None
+            punctuation = "" if one_sentence else "."
             claims.append(
-                f"{aspect_labels[aspect]}: {phrase}. [{source['source_id']}]"
+                f"{aspect_labels[aspect]}: {phrase}{punctuation} "
+                f"[{source['source_id']}]"
             )
             if source["source_id"] not in selected_ids:
                 selected.append(source)
@@ -1253,19 +1339,25 @@ def _structured_comparison_result(question, sources, trace):
         vegetation = _vegetation_summary_phrase(vegetation_row, subject)
         if not vegetation:
             return None
+        punctuation = "" if one_sentence else "."
         claims.append(
             "Doğal bitki örtüsü: "
-            f"{vegetation}. [{vegetation_source['source_id']}]"
+            f"{vegetation}{punctuation} [{vegetation_source['source_id']}]"
         )
         if vegetation_source["source_id"] not in selected_ids:
             selected.append(vegetation_source)
             selected_ids.add(vegetation_source["source_id"])
 
+        separator = ", " if one_sentence else " "
         paragraphs.append(
-            f"{subject.capitalize()} iklimi — " + " ".join(claims)
+            f"{subject.capitalize()} iklimi — " + separator.join(claims)
         )
 
-    answer = "\n\n".join(paragraphs)
+    answer = (
+        "; buna karşılık ".join(paragraphs) + "."
+        if one_sentence
+        else "\n\n".join(paragraphs)
+    )
     known_ids = {source["source_id"] for source in sources}
     if not valid_citations(answer, selected_ids, known_ids):
         return None
@@ -1281,6 +1373,332 @@ def _structured_comparison_result(question, sources, trace):
         "answer_method": "structured_evidence",
         "trace": trace,
     }
+
+
+def _direct_evidence_result(answer, selected_sources, all_sources, trace):
+    """Açık kaynak değerlerinden kurulan kısa cevabı son kez denetler."""
+    selected = []
+    selected_ids = set()
+    for source in selected_sources:
+        if source["source_id"] not in selected_ids:
+            selected.append(source)
+            selected_ids.add(source["source_id"])
+
+    known_ids = {source["source_id"] for source in all_sources}
+    if not valid_citations(answer, selected_ids, known_ids):
+        return None
+
+    trace.append({
+        "tool": "direct_evidence_answer",
+        "found": len(selected),
+    })
+    return {
+        "answer": answer,
+        "sources": selected,
+        "outcome": "answered",
+        "answer_method": "structured_evidence",
+        "trace": trace,
+    }
+
+
+def _direct_max_precipitation_result(question, sources, trace):
+    """Tek mevsim isteyen soruda komşu PDF maddelerini cevaba taşımaz."""
+    normalized = _normalize_text(question)
+    if not (
+        re.search(r"\ben\s+fazla\s+yagis\w*\b", normalized)
+        and re.search(r"\bhangi\s+mevsim\w*\b", normalized)
+    ):
+        return None
+
+    subject_match = re.search(
+        r"\b([^\W\d_][\w’'\-]*)\s+iklim\w*",
+        str(question),
+        flags=re.IGNORECASE | re.UNICODE,
+    )
+    if not subject_match:
+        return None
+    subject_display = subject_match.group(1)
+    subject = _normalize_text(subject_display)
+    season_pattern = re.compile(
+        r"\ben\s+fazla\s+yagis\w*"
+        r"(?:\s+donem\w*)?\s+(?:ise\s+)?"
+        r"(ilkbahar|yaz|sonbahar|kis)\w*\b"
+    )
+    candidates = []
+
+    for source_index, source in enumerate(sources):
+        for unit in _evidence_units(source.get("text", "")):
+            unit_normalized = _normalize_text(unit)
+            for mention in re.finditer(
+                r"\b" + re.escape(subject) + r"\w*\b",
+                unit_normalized,
+            ):
+                tail = unit_normalized[mention.end():mention.end() + 400]
+                season_match = season_pattern.search(tail)
+                if not season_match:
+                    continue
+                before_value = tail[:season_match.start()]
+                intervening = re.findall(
+                    r"\b([a-z0-9]+)\s+iklim\w*\b",
+                    before_value,
+                )
+                if any(not _same_term(subject, item) for item in intervening):
+                    continue
+                candidates.append(
+                    (season_match.start(), source_index, season_match.group(1), source)
+                )
+                break
+
+    if not candidates:
+        return None
+    seasons = {item[2] for item in candidates}
+    if len(seasons) != 1:
+        return None
+
+    _, _, season, source = min(candidates, key=lambda item: item[:3])
+    season_display = {"kis": "kış"}.get(season, season)
+    subject_display = subject_display[:1].upper() + subject_display[1:]
+    answer = (
+        f"{subject_display} ikliminde en fazla yağış "
+        f"{season_display} mevsiminde görülür. [{source['source_id']}]"
+    )
+    return _direct_evidence_result(answer, [source], sources, trace)
+
+
+def _explicit_title_year_candidates(title_terms, source):
+    """Başlık-yıl ilişkisini aynı cümle veya etiketli komşu satırda bulur."""
+    units = _source_units(source.get("text", ""))
+    candidates = []
+
+    for index, unit in enumerate(units):
+        tokens = _tokens(unit)
+        if not all(_term_in_tokens(term, tokens) for term in title_terms):
+            continue
+
+        years = set(YEAR_PATTERN.findall(unit))
+        if len(years) == 1 and (
+            _term_in_tokens("ilan", tokens)
+            or len(tokens) <= len(title_terms) + 5
+        ):
+            candidates.append((len(unit), years.pop()))
+
+        # PDF'lerde "ISLAHAT FERMANI / Tarih: 1856" iki satıra
+        # ayrılabilir. Yalnızca kısa bir başlığın hemen ardındaki
+        # tarih/ilan etiketini birleştir.
+        if len(tokens) > len(title_terms) + 4:
+            continue
+        for end in range(index + 1, min(index + 3, len(units))):
+            detail = " ".join(units[index:end + 1])
+            detail_years = set(YEAR_PATTERN.findall(detail))
+            detail_normalized = _normalize_text(detail)
+            if (
+                len(detail_years) == 1
+                and re.search(r"\b(?:tarih\w*|ilan\w*)\b", detail_normalized)
+            ):
+                candidates.append((len(detail), detail_years.pop()))
+                break
+
+    return candidates
+
+
+def _direct_year_correction_result(question, sources, trace):
+    """Yanlış yıl öncülünü yalnızca açık belge yılıyla düzeltir."""
+    normalized = _normalize_text(question)
+    asked_year = YEAR_PATTERN.search(str(question))
+    if not (
+        asked_year
+        and re.search(r"\bilan\w*\b", normalized)
+        and re.search(
+            rf"\b{re.escape(asked_year.group())}\b(?:\s+\w+){{0,2}}\s+"
+            r"(?:mi|midir|miydi|muydu)\b",
+            normalized,
+        )
+    ):
+        return None
+
+    raw_title = str(question)[:asked_year.start()].strip(" \t,;:–—-?!.\"“”")
+    raw_title = re.sub(r"^(?:peki|acaba)\s+", "", raw_title, flags=re.I)
+    title_terms = _content_terms(raw_title)
+    if len(title_terms) < 2:
+        return None
+
+    candidates = []
+    for source_index, source in enumerate(sources):
+        for length, year in _explicit_title_year_candidates(title_terms, source):
+            candidates.append((length, source_index, year, source))
+    if not candidates or len({item[2] for item in candidates}) != 1:
+        return None
+
+    _, _, source_year, source = min(candidates, key=lambda item: item[:3])
+    verdict = "Evet" if source_year == asked_year.group() else "Hayır"
+    title = raw_title[:1].upper() + raw_title[1:]
+    answer = (
+        f"{verdict}. {title} {source_year} yılında ilan edilmiştir. "
+        f"[{source['source_id']}]"
+    )
+    return _direct_evidence_result(answer, [source], sources, trace)
+
+
+MONTH_PATTERN = re.compile(
+    r"\b([0-3]?\d)\s+"
+    r"(Ocak|Şubat|Mart|Nisan|Mayıs|Haziran|Temmuz|Ağustos|"
+    r"Eylül|Ekim|Kasım|Aralık)\s+(1\d{3}|20\d{2})\b",
+    flags=re.IGNORECASE | re.UNICODE,
+)
+
+
+def _event_date(text):
+    full = MONTH_PATTERN.search(text)
+    if full:
+        month = {
+            "ocak": "Ocak", "subat": "Şubat", "mart": "Mart",
+            "nisan": "Nisan", "mayis": "Mayıs", "haziran": "Haziran",
+            "temmuz": "Temmuz", "agustos": "Ağustos", "eylul": "Eylül",
+            "ekim": "Ekim", "kasim": "Kasım", "aralik": "Aralık",
+        }[_normalize_text(full.group(2))]
+        return f"{int(full.group(1))} {month} {full.group(3)}", full.group(3), True
+    years = set(YEAR_PATTERN.findall(text))
+    if len(years) == 1:
+        year = years.pop()
+        return year, year, False
+    return None
+
+
+def _clean_ruler_name(value, target):
+    value = re.split(r"[;\n]", value, maxsplit=1)[0].strip(" \t,;:–—-")
+    parenthetical = re.search(r"\(([^()]{3,80})\)", value)
+    outside = re.sub(r"\s*\([^()]*\)\s*$", "", value).strip()
+    inside = parenthetical.group(1).strip() if parenthetical else ""
+    if len(_tokens(inside)) >= 2 and len(_tokens(inside)) > len(_tokens(outside)):
+        value = inside
+    else:
+        value = outside
+    value = re.sub(r"[.!?]+$", "", value).strip()
+    words = re.findall(r"[\wÇĞİÖŞÜçğıöşüÂÎÛ’'.-]+", value, flags=re.UNICODE)
+    if not (2 <= len(words) <= 6):
+        return None
+    while words and _same_term(target, _normalize_text(words[0])):
+        words.pop(0)
+    if len(words) < 2 or any(word.isdigit() for word in words):
+        return None
+    return " ".join(words)
+
+
+def _event_ruler(text, target):
+    label = re.search(
+        r"(?:^|\n)\s*(?:Osmanlı\s+)?(?:padişahı?|hükümdarı?)\s*"
+        r"(?::|–|—|-)\s*([^;\n]{3,100})",
+        text,
+        flags=re.IGNORECASE | re.UNICODE | re.MULTILINE,
+    )
+    if not label:
+        plain_label = re.search(
+            r"(?:^|\n)\s*(?:Osmanlı\s+)?(?:padişahı?|hükümdarı?)\s+"
+            r"([^;\n]{3,100})",
+            text,
+            flags=re.IGNORECASE | re.UNICODE | re.MULTILINE,
+        )
+        if plain_label and re.match(
+            r"(?:[IVXLCDM]+\.\s+)?[A-ZÇĞİÖŞÜ]",
+            plain_label.group(1).lstrip(),
+        ):
+            label = plain_label
+    if label:
+        candidate = _clean_ruler_name(label.group(1), target)
+        if candidate:
+            return candidate
+
+    relation = re.search(
+        r"\b((?:[IVXLCDM]+\.\s+)?"
+        r"[A-ZÇĞİÖŞÜ][\wçğıöşüâîû’'.-]+"
+        r"(?:\s+[A-ZÇĞİÖŞÜ][\wçğıöşüâîû’'.-]+){1,4})"
+        r"\s+(?:tarafından|döneminde)\b",
+        text,
+        flags=re.UNICODE,
+    )
+    if relation:
+        return _clean_ruler_name(relation.group(1), target)
+    return None
+
+
+def _direct_conquest_result(question, sources, trace):
+    """Fetih tarihini ve hükümdarını kaynakta açık bloklardan kurar."""
+    normalized = _normalize_text(question)
+    if not (
+        re.search(r"\bhangi\s+tarih\w*\b", normalized)
+        and re.search(r"\bhangi\s+padisah\w*\b", normalized)
+        and re.search(r"\bfeth\w*\b", normalized)
+    ):
+        return None
+
+    target_match = re.match(r"^(.+?)\s+hangi\s+tarih", str(question), flags=re.I)
+    if not target_match:
+        return None
+    target_display = target_match.group(1).strip(" \t,;:–—-?!.\"“”")
+    target_terms = _content_terms(target_display)
+    if not target_terms:
+        return None
+    target = target_terms[0]
+
+    date_candidates = []
+    ruler_candidates = []
+    for source_index, source in enumerate(sources):
+        units = _source_units(source.get("text", ""))
+        for index, unit in enumerate(units):
+            tokens = _tokens(unit)
+            if not (
+                all(_term_in_tokens(term, tokens) for term in target_terms)
+                and _term_in_tokens("feth", tokens)
+            ):
+                continue
+            block = "\n".join(units[index:min(index + 5, len(units))])
+            date = _event_date(block)
+            ruler = _event_ruler(block, target)
+            if date:
+                date_candidates.append((not date[2], source_index, len(block), date, source))
+            if ruler:
+                ruler_candidates.append((-len(_tokens(ruler)), source_index, ruler, source))
+
+    if not date_candidates or not ruler_candidates:
+        return None
+    if len({item[3][1] for item in date_candidates}) != 1:
+        return None
+
+    _, _, _, date, date_source = min(
+        date_candidates,
+        key=lambda item: item[:4],
+    )
+    ruler_candidates.sort(key=lambda item: item[:3])
+    best_ruler = ruler_candidates[0]
+    ruler, ruler_source = best_ruler[2], best_ruler[3]
+    date_word = "tarihinde" if date[2] else "yılında"
+    source_ids = []
+    for source in (date_source, ruler_source):
+        if source["source_id"] not in source_ids:
+            source_ids.append(source["source_id"])
+    citations = " ".join(f"[{source_id}]" for source_id in source_ids)
+    answer = (
+        f"{target_display} {date[0]} {date_word} {ruler} döneminde "
+        f"fethedilmiştir. {citations}"
+    )
+    return _direct_evidence_result(
+        answer,
+        [date_source, ruler_source],
+        sources,
+        trace,
+    )
+
+
+def _direct_fact_result(question, sources, trace):
+    for builder in (
+        _direct_max_precipitation_result,
+        _direct_year_correction_result,
+        _direct_conquest_result,
+    ):
+        result = builder(question, sources, trace)
+        if result is not None:
+            return result
+    return None
 
 
 def _focused_excerpt_result(question, sources, trace):
@@ -1534,6 +1952,21 @@ def _sensitive_claims_supported(
     return True
 
 
+def _roman_name_claims_supported(answer, source_texts):
+    """Modelin kişi adına kaynakta olmayan bir Roma rakamı eklemesini engeller."""
+    combined = _normalize_text("\n".join(source_texts))
+    for match in re.finditer(
+        r"\b[IVXLCDM]+\.\s+"
+        r"[A-ZÇĞİÖŞÜ][^\W\d_]+"
+        r"(?:\s+[A-ZÇĞİÖŞÜ][^\W\d_]+){0,3}",
+        _strip_citations(answer),
+        flags=re.UNICODE,
+    ):
+        if _normalize_text(match.group()) not in combined:
+            return False
+    return True
+
+
 def _answer_has_source_support(
     answer,
     question,
@@ -1605,6 +2038,12 @@ def _answer_has_source_support(
         return False
 
     if not _sensitive_claims_supported(
+        answer,
+        source_texts,
+    ):
+        return False
+
+    if not _roman_name_claims_supported(
         answer,
         source_texts,
     ):
@@ -2654,6 +3093,14 @@ class RAGService:
         allowed_ids = [source["source_id"] for source in sources]
         trace.append({"tool": "answer_context", "found": len(sources),
                       "source_ids": allowed_ids})
+
+        direct = _direct_fact_result(
+            question,
+            evidence_sources,
+            trace,
+        )
+        if direct is not None:
+            return direct
 
         structured = _structured_comparison_result(
             question,

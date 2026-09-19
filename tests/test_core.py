@@ -25,8 +25,8 @@ class CoreTests(unittest.TestCase):
                 question,
                 "Karadeniz iklimi bitki örtüsü nasıl farklı",
                 "Akdeniz iklimi bitki örtüsü nasıl farklı",
-                "Karadeniz iklimi bitki örtüsü nasıl farklı flora bitki varlığı baskın görünüm",
-                "Akdeniz iklimi bitki örtüsü nasıl farklı flora bitki varlığı baskın görünüm",
+                "Karadeniz iklimi doğal bitki örtüsü flora bitki varlığı baskın görünüm",
+                "Akdeniz iklimi doğal bitki örtüsü flora bitki varlığı baskın görünüm",
             ],
         )
 
@@ -38,13 +38,39 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(
             _retrieval_queries(question),
             [
-                question,
-                "Karadeniz iklimlerini yağış rejimleri ve doğal bitki örtüleri bakımından karşılaştır",
-                "Akdeniz iklimlerini yağış rejimleri ve doğal bitki örtüleri bakımından karşılaştır",
                 "Karadeniz iklimi yağış rejimi yağışların mevsimlere dağılışı en fazla yağış en az yağış",
                 "Akdeniz iklimi yağış rejimi yağışların mevsimlere dağılışı en fazla yağış en az yağış",
-                "Karadeniz iklimlerini yağış rejimleri ve doğal bitki örtüleri bakımından karşılaştır flora bitki varlığı baskın görünüm",
-                "Akdeniz iklimlerini yağış rejimleri ve doğal bitki örtüleri bakımından karşılaştır flora bitki varlığı baskın görünüm",
+                "Karadeniz iklimi doğal bitki örtüsü flora bitki varlığı baskın görünüm",
+                "Akdeniz iklimi doğal bitki örtüsü flora bitki varlığı baskın görünüm",
+            ],
+        )
+
+    def test_attached_ile_comparison_splits_both_climates(self):
+        question = (
+            "Akdeniz iklimiyle Karadeniz iklimini yağış düzeni ve "
+            "bitki örtüsü yönünden kıyaslar mısın?"
+        )
+        queries = _retrieval_queries(question)
+        self.assertEqual(len(queries), 4)
+        self.assertTrue(any(query.startswith("Akdeniz iklimi yağış rejimi") for query in queries))
+        self.assertTrue(any(query.startswith("Karadeniz iklimi yağış rejimi") for query in queries))
+        self.assertIn(
+            "Akdeniz iklimi doğal bitki örtüsü flora bitki varlığı baskın görünüm",
+            queries,
+        )
+        self.assertIn(
+            "Karadeniz iklimi doğal bitki örtüsü flora bitki varlığı baskın görünüm",
+            queries,
+        )
+
+    def test_false_year_question_adds_a_year_neutral_verification_query(self):
+        question = "Islahat Fermanı 1876 yılında mı ilan edildi?"
+        self.assertEqual(
+            _retrieval_queries(question),
+            [
+                question,
+                "Islahat Fermanı yılında ilan edildi",
+                "Islahat Fermanı ilan tarihi hangi yıl",
             ],
         )
 

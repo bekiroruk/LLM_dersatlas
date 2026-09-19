@@ -69,9 +69,54 @@ def _noun_forms(word):
     return {word} | {word[:-len(s)] for s in suffixes if word.endswith(s) and len(word) - len(s) >= 4}
 
 
+def _attached_pair_topic(question):
+    """`iklimiyle ... iklimini` biçimindeki açık çifti güvenle ayırır."""
+    if not re.search(
+        r"\b(?:karsilastir|kiyasla)\w*\b",
+        _fold(question),
+    ):
+        return None
+
+    words = re.findall(r"[\w’'\-]+", question, flags=re.UNICODE)
+    folded = [_fold(word).strip("’'") for word in words]
+
+    for coordinator, token in enumerate(folded):
+        match = re.fullmatch(r"(.{4,})(?:yla|yle)", token)
+        if not match or coordinator == 0:
+            continue
+        shared = match.group(1)
+        for end in range(coordinator + 2, len(words)):
+            if not (_noun_forms(shared) & _noun_forms(folded[end])):
+                continue
+            left = " ".join(words[:coordinator]).strip()
+            right = " ".join(words[coordinator + 1:end]).strip()
+            if not left or not right or len(left) > 80 or len(right) > 80:
+                return None
+            common = re.sub(
+                r"(?:n[ıiuü])$",
+                "",
+                words[end],
+                flags=re.IGNORECASE,
+            )
+            if not common:
+                return None
+            # İki öznenin ortak adı Türkçede çoğul iyelikle daha
+            # doğal kurulur: "Akdeniz ve Karadeniz iklimleri".
+            possessive = re.fullmatch(r"(.+?)([ıiuü])", common, flags=re.I)
+            if possessive:
+                stem, vowel = possessive.groups()
+                plural = "lar" if vowel.casefold() in {"ı", "u"} else "ler"
+                common = f"{stem}{plural}{vowel}"
+            return f"{left} ve {right} {common}", common
+    return None
+
+
 def _paired_topic(previous):
     """Extract an explicit comparison subject, never facts from an answer."""
     previous = previous.strip().strip('“”"')
+    attached = _attached_pair_topic(previous)
+    if attached:
+        return attached
     # A previous fast-path question already carries its explicit topic.
     if " açısından " in previous:
         topic = previous.split(" açısından ", 1)[0]
@@ -144,10 +189,39 @@ def _explicit_follow_up(question, previous):
     pair = _paired_topic(previous)
     if not pair:
         return None
+
+    remaining = match[2].strip()
+    # "Bu iki iklim arasındaki en belirgin fark..." yalnızca iki konuya
+    # değil, bir önceki karşılaştırmanın kapsamına da gönderme yapar.
+    # Önceki cevabı değil, yalnızca kullanıcının önceki sorusunu arama
+    # niyeti olarak koru; kanıt yine yeni istekte belgelerden bulunacaktır.
+    if re.match(
+        r"^aras[ıi]ndaki\s+(?:en\s+belirgin\s+)?fark\w*\b",
+        remaining,
+        flags=re.I,
+    ):
+        request = re.sub(
+            r"^aras[ıi]ndaki\s+",
+            "",
+            remaining,
+            count=1,
+            flags=re.I,
+        )
+        base = re.sub(
+            r"\b(?:karşılaştırır|karsilastirir|kıyaslar|kiyaslar)\s+"
+            r"m[ıiuü]s[ıi]n$",
+            "karşılaştır",
+            previous.rstrip(" .!?"),
+            flags=re.I,
+        )
+        request = request[:1].upper() + request[1:]
+        candidate = base + ". " + request
+        return candidate if len(candidate) <= 1200 else None
+
     topic = _topic_for_reference(pair[0], match[1])
     if not topic:
         return None
-    candidate = topic + " açısından " + match[2]
+    candidate = topic + " açısından " + remaining
     # The remaining request is copied verbatim, including any year premise.
     # Only the demonstrative '2' is replaced by the explicit two subjects.
     return candidate if len(candidate) <= 1200 else None
@@ -163,6 +237,8 @@ def _explicit_pair_comparison(question):
         folded,
     ):
         return False
+    if _attached_pair_topic(plain):
+        return True
     coordinators = list(re.finditer(r"\b(?:ve|ile)\b", folded))
     if len(coordinators) != 1:
         return False

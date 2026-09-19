@@ -108,6 +108,33 @@ class ConversationTests(unittest.TestCase):
                 self.assertFalse(result.unresolved)
                 self.assertEqual(result.trace[0]["method"], "explicit_pair")
 
+    def test_attached_ile_comparison_is_standalone_and_resolves_its_follow_up(self):
+        class NoRewrite:
+            def chat(self, *args, **kwargs):
+                raise AssertionError("Açık iklim çifti bağlam modeline gönderilmemeli")
+
+        previous = (
+            "Akdeniz iklimiyle Karadeniz iklimini yağış düzeni ve "
+            "bitki örtüsü yönünden kıyaslar mısın?"
+        )
+        standalone = resolve_question(NoRewrite(), previous, [turn()], None)
+        self.assertEqual(standalone.question, previous)
+        self.assertFalse(standalone.used)
+        self.assertEqual(standalone.trace[0]["method"], "explicit_pair")
+
+        follow_up = "Bu iki iklim arasındaki en belirgin farkı tek cümlede özetler misin?"
+        resolved = resolve_question(
+            NoRewrite(),
+            follow_up,
+            [turn(question=previous)],
+            None,
+        )
+        self.assertTrue(resolved.used)
+        self.assertIn("bitki örtüsü", resolved.question)
+        self.assertIn("yağış düzeni", resolved.question)
+        self.assertIn("tek cümlede", resolved.question)
+        self.assertNotIn("Bu iki", resolved.question)
+
     def test_reference_word_prevents_explicit_pair_shortcut(self):
         question = "Karadeniz ve Akdeniz açısından bu iki iklim nasıl farklı?"
         model = RewriteModel(unresolved=True)

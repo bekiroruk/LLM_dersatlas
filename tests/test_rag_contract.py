@@ -10,6 +10,7 @@ from app.rag import (
     RAGService, _vegetation_subjects, _focused_vegetation_evidence,
     _answer_references, _answer_schema, AnswerPayload,
     SourcedAnswerPayload, InsufficientAnswerPayload,
+    _roman_name_claims_supported,
 )
 
 
@@ -313,6 +314,105 @@ class RagContractTests(unittest.TestCase):
         self.assertNotIn("Yayılış Gürcistan", result["answer"])
         self.assertNotIn("Notlarındaki ilgili kaynak satırları", result["answer"])
         self.assertEqual(model.calls, [])
+
+    def test_attached_ile_wording_uses_the_same_structured_comparison(self):
+        question = (
+            "Akdeniz iklimiyle Karadeniz iklimini yağış düzeni ve "
+            "bitki örtüsü yönünden kıyaslar mısın?"
+        )
+        rainfall = source(
+            "rainfall",
+            "Akdeniz ikliminde yağış düzensizdir ve yaz kuraklığı görülür. "
+            "Karadeniz ikliminde yağış yıl boyunca düzenlidir.",
+        )
+        result, model = self.run_question(
+            question,
+            sources=[source("plants", TABLE), rainfall],
+        )
+        self.assertEqual(result["answer_method"], "structured_evidence")
+        self.assertIn("Akdeniz iklimi", result["answer"])
+        self.assertIn("Karadeniz iklimi", result["answer"])
+        self.assertIn("Kızılçam, maki", result["answer"])
+        self.assertIn("Nemli ormanlar", result["answer"])
+        self.assertEqual(model.calls, [])
+
+    def test_context_summary_request_produces_exactly_one_grounded_sentence(self):
+        question = (
+            "Akdeniz iklimiyle Karadeniz iklimini yağış düzeni ve "
+            "bitki örtüsü yönünden kıyaslar mısın. en belirgin "
+            "farkı tek cümlede özetler misin?"
+        )
+        rainfall = source(
+            "rainfall",
+            "Akdeniz ikliminde yağış düzensizdir ve yaz kuraklığı görülür. "
+            "Karadeniz ikliminde yağış yıl boyunca düzenlidir.",
+        )
+        result, model = self.run_question(
+            question,
+            sources=[source("plants", TABLE), rainfall],
+        )
+        self.assertEqual(result["answer_method"], "structured_evidence")
+        self.assertEqual(result["answer"].count("."), 1)
+        self.assertIn("buna karşılık", result["answer"])
+        self.assertEqual(model.calls, [])
+
+    def test_single_rainfall_fact_returns_only_the_requested_season(self):
+        notes = source(
+            "rainfall",
+            "Karadeniz ikliminde her ay yağış 50 mm üzerindedir ve en fazla "
+            "yağış sonbahardadır. Tuzak: Grafikte önce 50 mm çizgisini "
+            "kontrol edin. Sert karasal iklimde yaz maksimumu vardır.",
+        )
+        result, model = self.run_question(
+            "Karadeniz ikliminde en fazla yağış hangi mevsimde görülür?",
+            sources=[notes],
+        )
+        self.assertEqual(
+            result["answer"],
+            "Karadeniz ikliminde en fazla yağış sonbahar mevsiminde görülür. [K1]",
+        )
+        self.assertNotIn("Tuzak", result["answer"])
+        self.assertEqual(model.calls, [])
+
+    def test_false_year_premise_is_corrected_from_explicit_source(self):
+        notes = source("reform", "Islahat Fermanı 1856 yılında ilan edilmiştir.")
+        result, model = self.run_question(
+            "Islahat Fermanı 1876 yılında mı ilan edildi?",
+            sources=[notes],
+        )
+        self.assertEqual(
+            result["answer"],
+            "Hayır. Islahat Fermanı 1856 yılında ilan edilmiştir. [K1]",
+        )
+        self.assertEqual(model.calls, [])
+
+    def test_conquest_date_and_ruler_are_copied_from_explicit_event_block(self):
+        notes = source(
+            "conquest",
+            "İstanbul'un Fethi\nTarih: 29 Mayıs 1453\n"
+            "Padişah: Fatih Sultan Mehmet",
+        )
+        result, model = self.run_question(
+            "İstanbul hangi tarihte ve hangi padişah döneminde fethedildi?",
+            sources=[notes],
+        )
+        self.assertEqual(
+            result["answer"],
+            "İstanbul 29 Mayıs 1453 tarihinde Fatih Sultan Mehmet döneminde "
+            "fethedilmiştir. [K1]",
+        )
+        self.assertNotIn("I. Fatih", result["answer"])
+        self.assertEqual(model.calls, [])
+
+    def test_model_cannot_add_an_unsupported_roman_ordinal_to_a_name(self):
+        self.assertFalse(_roman_name_claims_supported(
+            "İstanbul I. Fatih Sultan döneminde fethedildi.",
+            ["Fatih Sultan Mehmet tarafından fethedildi."],
+        ))
+        self.assertTrue(_roman_name_claims_supported(
+            "I. Meşrutiyet ilan edildi.",
+            ["I. Meşrutiyet ilan edildi."],
+        ))
 
     def test_drought_resistant_plants_are_not_rainfall_evidence(self):
         question = (

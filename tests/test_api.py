@@ -684,6 +684,80 @@ class APITests(unittest.TestCase):
         self.assertNotIn("orman yangını hassasiyeti", result["answer"])
         model_call.assert_not_called()
 
+    def test_reported_seven_question_sequence_is_grounded_end_to_end(self):
+        geography = self.owned_subject()
+        self.ready_in(
+            geography,
+            "Yayılış: Karadeniz kıyıları. Yaz serin ve yağışlı, "
+            "kış ılık ve yağışlı. En fazla yağış sonbahar.\n"
+            "Yayılış: Akdeniz kıyıları. Yaz sıcak ve kurak, kış ılık "
+            "ve yağışlı. En fazla yağış kış.\n"
+            "Flora bölgesi Türkiye'de yayılışı Baskın görünüm\n"
+            "Avrupa-Sibirya Karadeniz kıyı kuşağı Nemli ormanlar\n"
+            "Akdeniz Akdeniz iklim sahaları Kızılçam, maki ve kuraklığa "
+            "dayanıklı Akdeniz türleri",
+        )
+        self.ready_in(
+            self.subject,
+            "İstanbul'un Fethi\nTarih: 29 Mayıs 1453\n"
+            "Padişah: Fatih Sultan Mehmet\n\n"
+            "Islahat Fermanı 1856 yılında ilan edilmiştir.",
+        )
+
+        exact = (
+            "Karadeniz ve Akdeniz iklimlerini yağış rejimleri ve doğal "
+            "bitki örtüleri bakımından karşılaştır."
+        )
+        paraphrase = (
+            "Akdeniz iklimiyle Karadeniz iklimini yağış düzeni ve bitki "
+            "örtüsü yönünden kıyaslar mısın?"
+        )
+        follow_up = "Bu iki iklim arasındaki en belirgin farkı tek cümlede özetler misin?"
+
+        def ask(question, history=None):
+            return self.client.post(
+                "/api/questions",
+                json={"question": question, "mode": "rag", "history": history or []},
+                headers=self.headers,
+            ).json()
+
+        with patch.object(
+            self.model,
+            "chat",
+            side_effect=AssertionError("Bu yedi senaryo cevap modeline bağlı olmamalı"),
+        ):
+            first = ask(exact)
+            second = ask(paraphrase)
+            third = ask(follow_up, [{
+                "question": paraphrase,
+                "resolved_question": paraphrase,
+                "answer": second["answer"],
+            }])
+            season = ask("Karadeniz ikliminde en fazla yağış hangi mevsimde görülür?")
+            conquest = ask("İstanbul hangi tarihte ve hangi padişah döneminde fethedildi?")
+            reform = ask("Islahat Fermanı 1876 yılında mı ilan edildi?")
+            python = ask("Python'da liste nasıl oluşturulur?")
+
+        for result in (first, second):
+            self.assertEqual(result["answer_method"], "structured_evidence")
+            self.assertIn("Nemli ormanlar", result["answer"])
+            self.assertIn("Kızılçam, maki", result["answer"])
+        self.assertTrue(third["context_used"])
+        self.assertEqual(third["answer"].count("."), 1)
+        self.assertEqual(
+            season["answer"],
+            "Karadeniz ikliminde en fazla yağış sonbahar mevsiminde görülür. [K1]",
+        )
+        self.assertIn("29 Mayıs 1453", conquest["answer"])
+        self.assertIn("Fatih Sultan Mehmet", conquest["answer"])
+        self.assertNotIn("I. Fatih", conquest["answer"])
+        self.assertEqual(
+            reform["answer"],
+            "Hayır. Islahat Fermanı 1856 yılında ilan edilmiştir. [K1]",
+        )
+        self.assertEqual(python["outcome"], "insufficient")
+        self.assertEqual(python["sources"], [])
+
     def test_exact_climate_follow_up_after_detailed_comparison_is_resolved(self):
         geography = self.owned_subject()
         doc_id = self.ready_in(
@@ -776,8 +850,8 @@ class APITests(unittest.TestCase):
                 "Karadeniz ve Akdeniz iklimi açısından bitki örtüsü nasıl farklı?",
                 "Karadeniz iklimi bitki örtüsü nasıl farklı",
                 "Akdeniz iklimi bitki örtüsü nasıl farklı",
-                "Karadeniz iklimi bitki örtüsü nasıl farklı flora bitki varlığı baskın görünüm",
-                "Akdeniz iklimi bitki örtüsü nasıl farklı flora bitki varlığı baskın görünüm",
+                "Karadeniz iklimi doğal bitki örtüsü flora bitki varlığı baskın görünüm",
+                "Akdeniz iklimi doğal bitki örtüsü flora bitki varlığı baskın görünüm",
             ],
         )
         insufficient = {"role": "assistant", "content": json.dumps({
