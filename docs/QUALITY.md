@@ -56,3 +56,9 @@ Kullanıcının “Karadeniz ve Akdeniz iklimini karşılaştır” ardından �
 Toplam 122 Python ve 15 DOM mantık testi yerel ortamda başarılı. Yeni regresyonlar bildirilen soruyu yeniden yazım modeli olmadan çözmeyi, başka konu çiftlerini, tırnak/ASCII/sayı varyantlarını, mevcut yıl öncülünü korumayı, son konu değişimini ve yanlış isim/üçlü karşılaştırmada otomatik bağlam eklememeyi kapsar. Model tabanlı yolun bozuk JSON/şema ve sayı değişimi reddi korunur. Arayüz güvenli ret açıklamasını gösterir; bilinmeyen hata içeriğini basmaz.
 
 Bu sonuç takip sorusunun arama metninin çözümünü doğrular; gerçek PDF'lerde bitki örtüsü bilgisinin bulunması ve gerçek Ollama cevabının doğruluğu ayrıca denenmelidir.
+
+### Bildirilen dağınık karşılaştırma cevabı — 2026-09-19
+
+Bağlam çözümü gerçek denemede çalıştı; ancak bitki örtüsü sorusunda iklim, yer şekli ve kategori listelerini taşıyan geniş PDF parçaları cevap gibi birleştirildi. Bu çıktı doğru atıf biçimine sahip olsa da soruyu anlamlı biçimde yanıtlamadığı için başarısız kabul edildi.
+
+Arama artık iki karşılaştırma tarafı için ayrı sorgular üretir ve konuya özel parçaları katalog satırlarından önce sıralar. Doğrulayıcı kanıtı yetersiz bulursa karşılaştırmalarda extractive fallback kapatılır; sistem dağınık metni göstermek yerine kaynak yetersiz döner. Regresyon kümesi, doğrudan Karadeniz/orman ve Akdeniz/maki parçalarının ilk iki sıraya gelmesini ve yalnızca kategori listesi varken cevap üretilmemesini kapsar. Toplam 125 Python ve 15 DOM mantık testi yerel Linux'ta başarılıdır; gerçek PDF/Ollama tekrarı yine gereklidir.

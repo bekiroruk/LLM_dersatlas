@@ -20,6 +20,7 @@ Ders materyalleri, yerel ortam ayarları, veritabanı ve vektör indeksleri akta
 - Kullanıcı üç hedefli senaryonun beklenen şekilde cevaplandığını bildirdi.
 - Genel Sohbet/ajan/filtre için kullanıcı ilk beş kabul sorusunun beklenen sonucu verdiğini bildirdi.
 - İlk gerçek iklim takip sorusunda bağlam çözülemedi. Açık iki-konu göndermesi için modelden bağımsız, dar bir çözüm ve güvenli ret açıklamaları eklendi; kullanıcı bilgisayarında yeniden deneme bekleniyor.
+- İkinci gerçek iklim denemesinde bağlam başarıyla çözüldü; ancak dağınık kategori parçaları cevap olarak birleştirildi. İki taraflı arama önceliği ve karşılaştırmalarda güvenli yetersiz-kanıt reddi eklendi; yeniden gerçek PDF/Ollama denemesi bekleniyor.
 
 ## Doğrulama
 
@@ -34,6 +35,8 @@ Güncel Linux/Windows CI durumu [GitHub Actions](https://github.com/bekiroruk/LL
 Sohbet bağlamı değişikliğinde yerel Linux'ta 113 Python testi ve 14 DOM mantık testi başarılı. Testlerde gerçek SQLite/Qdrant ve bir model test çifti kullanıldı. Takip sorusunu anlama, yeni konu ayrımı, kaynak olarak geçmiş kullanmama, güncel yetkiler, sınırlar, kapsam değişimi ve gecikmiş cevap temizliği kapsandı. Gerçek model/görsel tarayıcı denemesi yerine geçmez.
 
 Açık gönderme düzeltmesiyle toplam 122 Python ve 15 DOM mantık testi yerel Linux'ta başarılı. Bildirilen soru, yeniden yazım modelini çağırmayı hata sayan bir regresyonla doğrulandı; cevap yine güncel SQLite/Qdrant kaynaklarıyla üretilir. Gerçek Ollama/PDF sonucu henüz yeniden doğrulanmadı.
+
+Karşılaştırma kaynak kalitesi düzeltmesiyle toplam 125 Python ve 15 DOM mantık testi yerel Linux'ta başarılı. Gerçekçi katalog metni cevap olarak reddedildi; iki iklime ait açık kanıt parçalarının önceliği doğrulandı. Bu otomatik sonuç gerçek model doğruluk garantisi değildir.
 
 ## Bilinen sınırlamalar
 

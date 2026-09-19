@@ -5,11 +5,23 @@ from app.ranking import tokenize, bm25, reciprocal_rank_fusion
 from app.passwords import hash_password, check_password, token_hash
 from app.citations import valid_citations
 from app.ingestion import Section, DocumentError, chunk_sections, extract_document, clean_text
+from app.rag import _retrieval_queries
 from pypdf import PdfWriter
 from docx import Document as WordDocument
 
 
 class CoreTests(unittest.TestCase):
+    def test_comparison_retrieval_splits_both_sides(self):
+        question = "Karadeniz ve Akdeniz iklimi açısından bitki örtüsü nasıl farklı?"
+        self.assertEqual(
+            _retrieval_queries(question),
+            [
+                question,
+                "Karadeniz iklimi bitki örtüsü nasıl farklı",
+                "Akdeniz iklimi bitki örtüsü nasıl farklı",
+            ],
+        )
+
     def test_turkish_case(self):
         self.assertEqual(tokenize("ISLAHAT İSTANBUL ve 1839"), ["ıslahat", "istanbul", "1839"])
 

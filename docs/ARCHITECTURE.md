@@ -68,6 +68,8 @@ Kaynak kontrolleri şu düzeylerde ele alınmalıdır:
 
 Kaynak kimliklerinin geçerli olması yalnızca bu kontrollerin bir kısmıdır.
 
+Açık iki-konulu takip sorularında arama, birleşik soruya ek olarak her konu ve istenen özellik için iki alt sorguya ayrılır. Her iki konuyu yalnızca bir kategori listesinde anan geniş parçalar yerine, tek konu ile özelliği doğrudan bağlayan parçalar önce sıralanır. Doğrulayıcı iki taraf için açık kanıt bulamazsa ham PDF satırları karşılaştırma cevabı olarak kullanılmaz.
+
 ## Genel Sohbet ve araştırma ajanı
 
 Doküman yükleme ekranındaki ders seçimi ile sohbetin arama kapsamı ayrıdır:

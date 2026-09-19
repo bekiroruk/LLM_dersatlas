@@ -151,6 +151,8 @@ async function main() {
   questionTrace = [
     { tool: 'conversation_context', reason: 'invalid_json_or_schema' },
     { tool: 'conversation_context', reason: 'PRIVATE_TEST_MARKER' },
+    { tool: 'comparison_fallback_rejected' },
+    { tool: 'comparison_evidence_insufficient' },
   ];
   get('question').value = 'Başka bir bağlam denemesi';
   await context.submitQuestion();
@@ -158,6 +160,8 @@ async function main() {
   check('Bağlam reddinin güvenli açıklaması görünür; bilinmeyen ham hata kodu basılmaz', () => {
     assert.ok(get('messages').textContent.includes('Modelin bağlam çıktısı JSON şemasına uymadı'));
     assert.ok(get('messages').textContent.includes('Bağlam doğrulaması başarısız'));
+    assert.ok(get('messages').textContent.includes('Dağınık kaynak parçaları karşılaştırma cevabı olarak reddedildi'));
+    assert.ok(get('messages').textContent.includes('İki konu için açık karşılaştırma kanıtı bulunamadı'));
     assert.ok(!get('messages').textContent.includes('PRIVATE_TEST_MARKER'));
   });
   questionAnswer = 'Uzun cevap '.repeat(300);

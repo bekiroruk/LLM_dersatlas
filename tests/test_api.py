@@ -424,12 +424,14 @@ class APITests(unittest.TestCase):
         body.update(overrides)
         return self.client.post('/api/questions', json=body, headers=self.headers)
 
-    def context_model_chat(self, rewrite, needs_context=True, unresolved=False):
+    def context_model_chat(self, rewrite, needs_context=True, unresolved=False, answer=None):
         original_chat = self.model.chat
 
         def chat(messages, tools=None, schema=None):
             if schema and schema.get("title") == "ContextRewrite":
                 return {"role": "assistant", "content": json.dumps({"question": rewrite, "needs_context": needs_context, "unresolved": unresolved})}
+            if answer is not None and schema and schema.get("title") == "AnswerPayload":
+                return answer
             return original_chat(messages, tools=tools, schema=schema)
         return chat
 
@@ -437,8 +439,12 @@ class APITests(unittest.TestCase):
         geography = self.owned_subject()
         doc_id = self.ready_in(geography, "Karadeniz ikliminin doğal bitki örtüsü ormandır. Akdeniz ikliminin doğal bitki örtüsü makidir.")
         rewrite = "Karadeniz ve Akdeniz iklimi açısından bitki örtüsü nasıl farklı?"
+        grounded = {"role": "assistant", "content": json.dumps({
+            "answer": "Karadeniz ikliminin doğal bitki örtüsü ormandır. [K1] Akdeniz ikliminin doğal bitki örtüsü makidir. [K1]",
+            "source_ids": ["K1"], "insufficient_evidence": False,
+        })}
         for mode in ("rag", "agent"):
-            with self.subTest(mode=mode), patch.object(self.model, "chat", side_effect=self.context_model_chat(rewrite)), patch.object(self.app.state.rag, "retrieve", wraps=self.app.state.rag.retrieve) as retrieval:
+            with self.subTest(mode=mode), patch.object(self.model, "chat", side_effect=self.context_model_chat(rewrite, answer=grounded)), patch.object(self.app.state.rag, "retrieve", wraps=self.app.state.rag.retrieve) as retrieval:
                 result = self.history_request(mode=mode).json()
             self.assertEqual(result["outcome"], "answered")
             self.assertTrue(result["context_used"])
@@ -496,6 +502,11 @@ class APITests(unittest.TestCase):
         def no_rewriter(messages, tools=None, schema=None):
             if schema and schema.get("title") == "ContextRewrite":
                 raise AssertionError("Bu açık gönderme için yeniden yazım modeli çağrılmamalı")
+            if schema and schema.get("title") == "AnswerPayload":
+                return {"role": "assistant", "content": json.dumps({
+                    "answer": "Karadeniz ikliminin doğal bitki örtüsü ormandır. [K1] Akdeniz ikliminin doğal bitki örtüsü makidir. [K1]",
+                    "source_ids": ["K1"], "insufficient_evidence": False,
+                })}
             return original(messages, tools=tools, schema=schema)
 
         with patch.object(self.model, "chat", side_effect=no_rewriter):
@@ -503,6 +514,48 @@ class APITests(unittest.TestCase):
         self.assertEqual(result["outcome"], "answered")
         self.assertEqual(result["trace"][0]["method"], "explicit_reference")
         self.assertEqual({s["document_id"] for s in result["sources"]}, {doc_id})
+
+    def test_comparison_search_prioritizes_each_side_over_catalog_chunk(self):
+        geography = self.owned_subject()
+        self.ready_in(geography, "İklim: Akdeniz, Karadeniz, karasal. Bitki örtüsü: orman, maki, bozkır, çayır.")
+        left = self.ready_in(geography, "Karadeniz ikliminin doğal bitki örtüsü ormandır.")
+        right = self.ready_in(geography, "Akdeniz ikliminin doğal bitki örtüsü makidir.")
+        with self.app.state.sessions() as db, patch.object(self.model, "embed", wraps=self.model.embed) as embed:
+            user = db.scalar(select(User).where(User.username == "bekir"))
+            sources = self.app.state.rag.retrieve(
+                db, user, None,
+                "Karadeniz ve Akdeniz iklimi açısından bitki örtüsü nasıl farklı?",
+            )
+        self.assertEqual([source["document_id"] for source in sources[:2]], [left, right])
+        self.assertEqual(
+            embed.call_args.args[0],
+            [
+                "Karadeniz ve Akdeniz iklimi açısından bitki örtüsü nasıl farklı?",
+                "Karadeniz iklimi bitki örtüsü nasıl farklı",
+                "Akdeniz iklimi bitki örtüsü nasıl farklı",
+            ],
+        )
+        insufficient = {"role": "assistant", "content": json.dumps({
+            "answer": "", "source_ids": [], "insufficient_evidence": True,
+        })}
+        with patch.object(self.model, "chat", return_value=insufficient):
+            result = self.history_request().json()
+        self.assertEqual(
+            [source["document_id"] for source in result["sources"][:2]],
+            [left, right],
+        )
+
+    def test_comparison_never_turns_catalog_text_into_an_answer(self):
+        geography = self.owned_subject()
+        self.ready_in(geography, "Yer şekilleri ovalar ve dağlar. İklim: Akdeniz, Karadeniz, karasal. Bitki örtüsü: orman, maki, bozkır, çayır.")
+        insufficient = {"role": "assistant", "content": json.dumps({
+            "answer": "", "source_ids": [], "insufficient_evidence": True,
+        })}
+        with patch.object(self.model, "chat", return_value=insufficient):
+            result = self.history_request().json()
+        self.assertEqual(result["outcome"], "insufficient")
+        self.assertNotIn("Yer şekilleri", result["answer"])
+        self.assertTrue(any(step["tool"] == "comparison_evidence_insufficient" for step in result["trace"]))
 
     def test_history_scope_mismatch_does_not_rewrite(self):
         self.ready_document()

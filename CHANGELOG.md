@@ -4,6 +4,13 @@ Yalnızca gerçekten yapılan değişiklikler kaydedilir. Planlanan özellikler 
 
 ## Unreleased
 
+### Karşılaştırma kaynağı kalitesi — 2026-09-19
+
+- Açık iki-konulu takip soruları, her konu için ayrı sözcüksel aramalara bölünür; iki tarafa ait doğrudan kaynaklar genel kategori listelerinden önce sunulur.
+- Kaynak doğrulayıcı karşılaştırma kanıtını yetersiz bulduğunda dağınık PDF parçaları artık cevap gibi birleştirilmez. Açık kanıt yoksa sistem kaynak yetersiz sonucuna döner.
+- Karşılaştırma istemleri, iki tarafın istenen özelliğini ayrı ayrı doğrulamayı ve ilişkisiz kategori listelerini eşleştirmemeyi açıkça zorunlu kılar.
+- Bildirilen iklim örneğini temsil eden katalog/direkt kaynak regresyonları eklendi; 125 Python ve 15 JavaScript mantık testi yerel Linux ortamında başarılı.
+
 ### Açık takip göndermelerinin çözümü — 2026-09-18
 
 - “Bu iki iklimin…” gibi açık göndermeler, son bağımsız karşılaştırma sorusunun konu adlarıyla model çağrısı olmadan açılır; “Bunu kısalt” da önceki bağımsız soruya bağlanır. Konu veya cevap bilgisi koda sabitlenmez.
