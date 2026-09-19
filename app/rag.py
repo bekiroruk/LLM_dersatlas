@@ -16,7 +16,7 @@ from .ranking import bm25, reciprocal_rank_fusion
 from .security import search_subject_ids
 
 
-RAG_REVISION = "2026-09-19-source-contract-v7"
+RAG_REVISION = "2026-09-19-source-contract-v8"
 
 
 NO_EVIDENCE = (
@@ -484,6 +484,13 @@ def _retrieval_queries(question):
         ):
             queries.append(comparison_query)
 
+    for aspect_query, _, _ in _climate_aspect_query_specs(question):
+        if all(
+            _normalize_text(aspect_query) != _normalize_text(known)
+            for known in queries
+        ):
+            queries.append(aspect_query)
+
     for vegetation_query in _vegetation_search_queries(question):
         if all(
             _normalize_text(vegetation_query) != _normalize_text(known)
@@ -491,7 +498,7 @@ def _retrieval_queries(question):
         ):
             queries.append(vegetation_query)
 
-    return queries[:6]
+    return queries[:10]
 
 
 def _comparison_search_queries(question):
@@ -551,10 +558,6 @@ def _requested_climate_aspects(question):
 
 
 CLIMATE_ASPECT_EVIDENCE_PATTERNS = {
-    "precipitation": (
-        r"\b(?:yagis\w*|yaz\w*(?:\s+\w+){0,3}\s+kurak\w*|"
-        r"kurak\s+mevsim\w*)\b"
-    ),
     "temperature": r"\b(?:sicaklik\w*|sicak\w*|soguk\w*|ilik\w*|derece\w*)\b",
     "humidity": (
         r"\b(?:nemlilik\w*|(?:bagil|mutlak)\s+nem\w*|"
@@ -565,11 +568,71 @@ CLIMATE_ASPECT_EVIDENCE_PATTERNS = {
 }
 
 
+def _climate_aspect_query_specs(question):
+    """Her karşılaştırma tarafı ve istenen iklim boyutu için kesin arama."""
+    bases = _comparison_search_queries(question)
+    subjects = _vegetation_subjects(question)
+    aspects = _requested_climate_aspects(question)
+    suffixes = {
+        "precipitation": (
+            "yağış rejimi yağışların mevsimlere dağılışı "
+            "en fazla yağış en az yağış"
+        ),
+        "temperature": "sıcaklık yaz kış ortalama derece",
+        "humidity": "nem bağıl nem nemlilik oranı",
+        "wind": "rüzgâr rejimi hâkim rüzgâr",
+        "pressure": "basınç rejimi yüksek alçak basınç",
+    }
+    specs = []
+
+    for subject, base in zip(subjects, bases, strict=False):
+        head_match = re.match(
+            r"^(.+?\s+iklim\w*)\b",
+            base,
+            flags=re.IGNORECASE | re.UNICODE,
+        )
+        head = head_match.group(1).strip() if head_match else f"{subject} iklimi"
+        head = re.sub(r"\biklim\w*$", "iklimi", head, flags=re.IGNORECASE)
+        for aspect in aspects:
+            specs.append((f"{head} {suffixes[aspect]}", subject, aspect))
+
+    return specs
+
+
+def _has_climate_aspect_value(text, aspect):
+    """Sadece istenen iklim ölçütünü gerçekten açıklayan ifadeyi kabul eder."""
+    normalized = _normalize_text(text)
+    if aspect != "precipitation":
+        pattern = CLIMATE_ASPECT_EVIDENCE_PATTERNS.get(aspect)
+        return bool(pattern and re.search(pattern, normalized))
+
+    direct = re.search(
+        r"\b(?:yagis\s+rejim\w*|en\s+(?:fazla|az)\s+yagis\w*|"
+        r"her\s+mevsim\w*\s+yagis\w*|yil\s+boyu\w*\s+yagis\w*|"
+        r"yagis\w*(?:\s+\w+){0,5}\s+(?:duzenli\w*|duzensiz\w*|"
+        r"mevsim\w*|dagil\w*|fazla\w*|az\w*))\b",
+        normalized,
+    )
+    if direct:
+        return True
+
+    # Ders notlarında rejim bazen iki mevsim karşıtlığıyla anlatılır.
+    summer_dry = re.search(
+        r"\byaz\w*(?:\s+\w+){0,3}\s+kurak\w*\b",
+        normalized,
+    )
+    winter_rainy = re.search(
+        r"\bkis\w*(?:\s+\w+){0,3}\s+yagis\w*\b",
+        normalized,
+    )
+    return bool(summer_dry and winter_rainy)
+
+
 def _focused_climate_aspect_evidence(question, text, aspect):
     """Bir iklim boyutunu her karşılaştırma tarafıyla aynı bölümde bulur."""
     subjects = _vegetation_subjects(question)
-    pattern = CLIMATE_ASPECT_EVIDENCE_PATTERNS.get(aspect)
-    if not subjects or not pattern:
+    known_aspects = {"precipitation", *CLIMATE_ASPECT_EVIDENCE_PATTERNS}
+    if not subjects or aspect not in known_aspects:
         return None
 
     lines = _source_units(text)
@@ -600,7 +663,7 @@ def _focused_climate_aspect_evidence(question, text, aspect):
 
                 body_parts.append(lines[end])
                 body = " ".join(body_parts).strip()
-                if re.search(pattern, _normalize_text(body)):
+                if _has_climate_aspect_value(body, aspect):
                     explicit_climate = int(bool(re.search(
                         r"\b" + re.escape(subject) + r"\w*\s+iklim\w*\b",
                         _normalize_text(body),
@@ -1791,11 +1854,16 @@ class RAGService:
             _normalize_text(item)
             for item in _vegetation_search_queries(question)
         }
+        aspect_specs = {
+            _normalize_text(query): (subject, aspect)
+            for query, subject, aspect in _climate_aspect_query_specs(question)
+        }
         comparison_primary = {
             _normalize_text(item): (_question_anchors(item) or [None])[0]
             for item in _comparison_search_queries(question)
         }
         comparison_lexical = []
+        aspect_lexical = []
 
         for search_query, query_vector in zip(
             search_queries,
@@ -1861,6 +1929,20 @@ class RAGService:
                 # tek birleşik kanıt varsa yine kaybedilmez.
                 comparison_lexical.append((exclusive or qualified)[:2])
 
+            aspect_spec = aspect_specs.get(_normalize_text(search_query))
+            if aspect_spec:
+                subject, aspect = aspect_spec
+                qualified = []
+                for key, _ in lexical:
+                    focus = _focused_climate_aspect_evidence(
+                        question,
+                        allowed[key][0].text,
+                        aspect,
+                    )
+                    if focus and subject in focus["relations"]:
+                        qualified.append(key)
+                aspect_lexical.append(qualified[:2])
+
             rankings.extend(
                 (
                     dense,
@@ -1887,6 +1969,11 @@ class RAGService:
         selected_keys = {key for key, _ in selected_ranked}
         ranked_scores = dict(ranked)
         for lexical in comparison_lexical:
+            for key in lexical:
+                if key not in selected_keys:
+                    selected_ranked.append((key, ranked_scores.get(key, 0.0)))
+                    selected_keys.add(key)
+        for lexical in aspect_lexical:
             for key in lexical:
                 if key not in selected_keys:
                     selected_ranked.append((key, ranked_scores.get(key, 0.0)))
@@ -1976,6 +2063,17 @@ class RAGService:
                 if focus and focus["marker_count"] >= 2:
                     prioritized.append(source)
                     seen.add(source["chunk_id"])
+
+        # Karma sorularda her tarafın açık yağış/sıcaklık vb. kanıtını,
+        # genel benzerlik puanı yüksek ama alakasız parçalardan önce koy.
+        for rank_index in range(2):
+            for lexical in aspect_lexical:
+                if rank_index >= len(lexical):
+                    continue
+                key = lexical[rank_index]
+                if key in candidate_sources and key not in seen:
+                    prioritized.append(candidate_sources[key])
+                    seen.add(key)
 
         # Her karşılaştırma tarafının en iyi kesin-sözcük sonucunu önce ver.
         # İkinci sonuçlar ancak iki tarafın ilk sonucu yerleştirildikten sonra gelir.

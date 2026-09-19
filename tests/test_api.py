@@ -625,6 +625,64 @@ class APITests(unittest.TestCase):
         self.assertEqual(result["trace"][0]["method"], "no_reference")
         self.assertEqual({source["document_id"] for source in result["sources"]}, {doc_id})
 
+    def test_mixed_climate_fallback_ignores_reported_false_matches(self):
+        geography = self.owned_subject()
+        self.ready_in(
+            geography,
+            "1 E 9 III-IV 17 Doğu Karadeniz güney yamacı "
+            "18 Kahverengi orman 19 Nemlilik ve yağış.",
+        )
+        self.ready_in(
+            geography,
+            "Türkiye’de orman yangını hassasiyeti Akdeniz ikliminin "
+            "görüldüğü kıyılarda yüksektir. Yaz sıcaklığı ve kuraklığı, "
+            "kuru orman altı örtüsü ve kızılçamlar hassasiyeti artırır.",
+        )
+        vegetation = self.ready_in(
+            geography,
+            "Flora bölgesi Türkiye'de yayılışı Baskın görünüm\n"
+            "Avrupa-Sibirya Karadeniz kıyı kuşağı Nemli ormanlar\n"
+            "Akdeniz Akdeniz iklim sahaları Kızılçam, maki",
+        )
+        rainfall = self.ready_in(
+            geography,
+            "Karadeniz ikliminde yağış yıl boyunca düzenlidir ve en fazla "
+            "yağış sonbaharda görülür. Akdeniz ikliminde yağış rejimi "
+            "düzensizdir ve en fazla yağış kışın görülür.",
+        )
+        question = (
+            "Karadeniz ve Akdeniz iklimlerini yağış rejimleri ve doğal "
+            "bitki örtüleri bakımından karşılaştır."
+        )
+
+        with self.app.state.sessions() as db:
+            user = db.scalar(select(User).where(User.username == "bekir"))
+            sources = self.app.state.rag.retrieve(db, user, None, question)
+        self.assertTrue({rainfall, vegetation}.issubset(
+            {source["document_id"] for source in sources[:4]}
+        ))
+
+        invalid = {"role": "assistant", "content": json.dumps({
+            "answer": "Geçersiz model yanıtı. [K99]",
+            "source_ids": ["K99"],
+            "insufficient_evidence": False,
+        })}
+        with patch.object(self.model, "chat", return_value=invalid):
+            result = self.client.post(
+                "/api/questions",
+                json={"question": question, "mode": "rag"},
+                headers=self.headers,
+            ).json()
+
+        self.assertEqual(result["outcome"], "answered")
+        self.assertEqual(result["answer_method"], "source_excerpt")
+        self.assertIn("yağış yıl boyunca düzenlidir", result["answer"])
+        self.assertIn("yağış rejimi düzensizdir", result["answer"])
+        self.assertIn("Nemli ormanlar", result["answer"])
+        self.assertIn("Kızılçam, maki", result["answer"])
+        self.assertNotIn("Doğu Karadeniz güney yamacı", result["answer"])
+        self.assertNotIn("orman yangını hassasiyeti", result["answer"])
+
     def test_exact_climate_follow_up_after_detailed_comparison_is_resolved(self):
         geography = self.owned_subject()
         doc_id = self.ready_in(

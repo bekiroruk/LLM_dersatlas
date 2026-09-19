@@ -287,6 +287,24 @@ class RagContractTests(unittest.TestCase):
         self.assertEqual(result["outcome"], "insufficient")
         self.assertEqual(model.calls, [])
 
+    def test_answer_key_and_wildfire_sources_are_not_rainfall_regimes(self):
+        question = (
+            "Karadeniz ve Akdeniz iklimlerini yağış rejimleri ve doğal "
+            "bitki örtüleri bakımından karşılaştır."
+        )
+        distractors = source(
+            "distractors",
+            "1 E 9 III-IV 17 Doğu Karadeniz güney yamacı 19 Nemlilik ve yağış. "
+            "Akdeniz ikliminin görüldüğü kıyılarda orman yangını hassasiyeti "
+            "yüksektir; yaz sıcaklığı ve kuraklığı etkilidir.",
+        )
+        result, model = self.run_question(
+            question,
+            sources=[source("plants", TABLE), distractors],
+        )
+        self.assertEqual(result["outcome"], "insufficient")
+        self.assertEqual(model.calls, [])
+
 
 if __name__ == "__main__":
     unittest.main()

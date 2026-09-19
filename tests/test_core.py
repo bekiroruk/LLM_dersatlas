@@ -8,6 +8,7 @@ from app.ingestion import Section, DocumentError, chunk_sections, extract_docume
 from app.rag import (
     _declared_source_ids,
     _focused_vegetation_evidence,
+    _focused_climate_aspect_evidence,
     _normalize_citation_shapes,
     _retrieval_queries,
 )
@@ -28,6 +29,39 @@ class CoreTests(unittest.TestCase):
                 "Akdeniz iklimi bitki örtüsü nasıl farklı flora bitki varlığı baskın görünüm",
             ],
         )
+
+    def test_mixed_comparison_adds_dedicated_rainfall_searches(self):
+        question = (
+            "Karadeniz ve Akdeniz iklimlerini yağış rejimleri ve doğal "
+            "bitki örtüleri bakımından karşılaştır."
+        )
+        self.assertEqual(
+            _retrieval_queries(question),
+            [
+                question,
+                "Karadeniz iklimlerini yağış rejimleri ve doğal bitki örtüleri bakımından karşılaştır",
+                "Akdeniz iklimlerini yağış rejimleri ve doğal bitki örtüleri bakımından karşılaştır",
+                "Karadeniz iklimi yağış rejimi yağışların mevsimlere dağılışı en fazla yağış en az yağış",
+                "Akdeniz iklimi yağış rejimi yağışların mevsimlere dağılışı en fazla yağış en az yağış",
+                "Karadeniz iklimlerini yağış rejimleri ve doğal bitki örtüleri bakımından karşılaştır flora bitki varlığı baskın görünüm",
+                "Akdeniz iklimlerini yağış rejimleri ve doğal bitki örtüleri bakımından karşılaştır flora bitki varlığı baskın görünüm",
+            ],
+        )
+
+    def test_rainfall_evidence_rejects_answer_key_and_wildfire_text(self):
+        question = (
+            "Karadeniz ve Akdeniz iklimlerini yağış rejimleri ve doğal "
+            "bitki örtüleri bakımından karşılaştır."
+        )
+        distractors = (
+            "1 E 9 III-IV 17 Doğu Karadeniz güney yamacı 18 Kahverengi orman 19 Nemlilik ve yağış",
+            "Türkiye’de orman yangını hassasiyeti Akdeniz ikliminin görüldüğü kıyılarda yüksektir. Yaz sıcaklığı ve kuraklığı etkilidir.",
+        )
+        for text in distractors:
+            with self.subTest(text=text):
+                self.assertIsNone(
+                    _focused_climate_aspect_evidence(question, text, "precipitation")
+                )
 
     def test_vegetation_table_row_is_kept_as_one_evidence_relation(self):
         text = """11. TÜRKİYE'NİN BİTKİ VARLIĞI
