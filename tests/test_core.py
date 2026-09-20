@@ -16,6 +16,7 @@ from app.rag import (
     _retrieval_queries,
     _evidence_coverage_keys,
     _seasonal_climate_phrase,
+    _precipitation_relation_quality,
 )
 from pypdf import PdfWriter
 from docx import Document as WordDocument
@@ -229,6 +230,41 @@ class CoreTests(unittest.TestCase):
                         "precipitation",
                     )
                 )
+
+    def test_broad_comparison_requires_complete_rainfall_relation(self):
+        question = (
+            "Karadeniz ve Akdeniz iklimlerini yağış rejimleri ve doğal "
+            "bitki örtüleri bakımından karşılaştır."
+        )
+        incomplete = (
+            "Karadeniz iklimi\nYaz sıcak ve kurak\n"
+            "Kış soğuk ve kar yağışlı.",
+            "Akdeniz iklimi orta kuşak ve mutlak konumla ilişkilidir; "
+            "en fazla yağış kışın cephelerle düşer.",
+        )
+        for text in incomplete:
+            with self.subTest(text=text):
+                self.assertIsNone(
+                    _focused_climate_aspect_evidence(
+                        question,
+                        text,
+                        "precipitation",
+                    )
+                )
+
+        self.assertEqual(
+            _precipitation_relation_quality(
+                "Karadeniz kıyıları Yaz serin ve yağışlı Kış ılık ve "
+                "yağışlı En fazla yağış sonbahar"
+            )[0],
+            1,
+        )
+        self.assertEqual(
+            _precipitation_relation_quality(
+                "Karadeniz ikliminde yağış yıl boyunca düzenlidir."
+            )[0],
+            1,
+        )
 
     def test_vegetation_table_row_is_kept_as_one_evidence_relation(self):
         text = """11. TÜRKİYE'NİN BİTKİ VARLIĞI

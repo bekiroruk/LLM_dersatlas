@@ -249,6 +249,32 @@ class RagContractTests(unittest.TestCase):
         self.assertEqual(result["outcome"], "insufficient")
         self.assertEqual(model.calls, [])
 
+    def test_incomplete_or_misassigned_rainfall_rows_fail_closed(self):
+        question = (
+            "Karadeniz ve Akdeniz iklimlerini yağış rejimleri ve doğal "
+            "bitki örtüleri bakımından karşılaştır."
+        )
+        bad_karadeniz = source(
+            "bad-karadeniz",
+            "Karadeniz iklimi\nYaz sıcak ve kurak\n"
+            "Kış soğuk ve kar yağışlı.",
+        )
+        incomplete_akdeniz = source(
+            "incomplete-akdeniz",
+            "Akdeniz iklimi orta kuşak ve mutlak konumla ilişkilidir; "
+            "en fazla yağış kışın cephelerle düşer.",
+        )
+
+        result, model = self.run_question(
+            question,
+            sources=[source("plants", TABLE), bad_karadeniz, incomplete_akdeniz],
+        )
+
+        self.assertEqual(result["outcome"], "insufficient")
+        self.assertNotIn("kış soğuk", result["answer"].casefold())
+        self.assertNotIn("mutlak konum", result["answer"].casefold())
+        self.assertEqual(model.calls, [])
+
     def test_mixed_question_uses_structured_evidence_before_model(self):
         question = (
             "Karadeniz ve Akdeniz iklimlerini yağış rejimleri ve doğal "

@@ -78,3 +78,11 @@ Gerçek kullanıcı çıktısında çok sütunlu iklim tablosu düz metne dönü
 `source-contract-v12` aynı parçada birden fazla karşılaştırma başlığı bulunan matrisleri reddeder ve iklim adıyla yağış değeri arasında açık iklim cümlesi, açık yağış etiketi veya aynı satırdaki yaz/kış ilişkisini zorunlu kılar. Regresyonlar üç gerçek PDF dikkat dağıtıcısını, bildirilen bozuk matrisi, geçerli mevsim tablosunu ve geçerli açık iklim cümlelerini birlikte kapsar.
 
 Son doğrulamada 189 Python testi ve 17 JavaScript arayüz mantığı testi başarılıdır. Kullanıcının gerçek bitki PDF'siyle yapılan uçtan uca denemede arama bilerek bozuk matrise yöneltildi; kapsam taraması yine doğru yağış satırlarıyla PDF sayfa 11'deki bitki tablosunu seçti ve `structured_evidence` cevabında yanlış parçaları kullanmadı.
+
+### Eksik yağış satırının tam rejim sayılması — 2026-09-20
+
+Son kullanıcı kabulünde Karadeniz için yalnızca “yaz sıcak ve kurak / kış soğuk ve kar yağışlı” parçası, Akdeniz için yalnızca “en fazla yağış kışın” cümlesi seçildi. Her iki parça da bazı yağış sözcükleri taşısa da geniş “yağış rejimi” karşılaştırmasını güvenilir biçimde tamamlamıyordu.
+
+`source-contract-v13`, iki iklimli yağış + bitki örtüsü sorusunda her yağış ilişkisi için tamlık koşulu uygular. Açık “yağış yıl boyunca düzenlidir / yağış rejimi düzensizdir” ilişkisi veya aynı konu satırında yaz, kış ve en fazla/az yağış dönemi birlikte yoksa parça zorunlu kanıt hücresini doldurmaz. Birden fazla aday varsa kaynak sırası yerine en ayrıntılı geçerli ilişki seçilir. Tam dört hücre bulunamazsa cevap modeli çağrılmadan güvenli biçimde reddedilir.
+
+Regresyonlar bildirilen iki yanlış cümleyi önce verip doğru satırları sona koyma ve doğru satırları tamamen kaldırma senaryolarını kapsar. Son doğrulamada 191 Python testi ve 17 JavaScript arayüz mantığı testi başarılıdır.

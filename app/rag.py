@@ -16,7 +16,7 @@ from .ranking import bm25, reciprocal_rank_fusion
 from .security import search_subject_ids
 
 
-RAG_REVISION = "2026-09-20-source-contract-v12"
+RAG_REVISION = "2026-09-20-source-contract-v13"
 
 
 NO_EVIDENCE = (
@@ -737,6 +737,41 @@ def _precipitation_matrix_is_ambiguous(text):
     return len(numeric_cells) >= 3 and len(column_words) >= 3
 
 
+def _precipitation_relation_quality(text):
+    """Yağış rejimi ilişkisinin geniş karşılaştırma için ayrıntı düzeyi."""
+    normalized = _normalize_text(text)
+    has_summer = bool(re.search(r"\byaz\w*\b", normalized))
+    has_winter = bool(re.search(r"\bkis\w*\b", normalized))
+    has_extreme = bool(re.search(
+        r"\ben\s+(?:fazla|az)\s+yagis\w*\b",
+        normalized,
+    ))
+    explicit_distribution = bool(re.search(
+        r"\b(?:"
+        r"yagis\s+rejim\w*(?:\s+\w+){0,4}\s+(?:duzenli\w*|duzensiz\w*|dagil\w*)|"
+        r"yagis\w*(?:\s+\w+){0,4}\s+(?:duzenli\w*|duzensiz\w*)|"
+        r"yil\s+boyu\w*(?:\s+\w+){0,2}\s+yagis\w*|"
+        r"yagis\w*(?:\s+\w+){0,2}\s+yil\s+boyu\w*|"
+        r"her\s+mevsim\w*(?:\s+\w+){0,2}\s+yagis\w*"
+        r")\b",
+        normalized,
+    ))
+    seasonal_detail = sum((has_summer, has_winter, has_extreme))
+    complete = explicit_distribution or (
+        has_summer and has_winter and has_extreme
+    )
+    return int(complete), int(explicit_distribution), seasonal_detail
+
+
+def _requires_complete_precipitation_relation(question):
+    """Çok ölçütlü iki-taraflı cevapta parçalı iklim satırını reddeder."""
+    return bool(
+        _asks_about_vegetation(question)
+        and len(_vegetation_subjects(question)) >= 2
+        and "precipitation" in _requested_climate_aspects(question)
+    )
+
+
 def _climate_relation_is_ambiguous(text, subject, subjects, aspect):
     """Konu ile değer arasındaki ilişki tek bir satıra indirgenebilmeli."""
     mentioned = _mentioned_comparison_subjects(text, subjects)
@@ -822,12 +857,30 @@ def _focused_climate_aspect_evidence(question, text, aspect):
                         aspect,
                     ):
                         break
+                    relation_quality = (
+                        _precipitation_relation_quality(body)
+                        if aspect == "precipitation"
+                        else (1, 0, 0)
+                    )
+                    if (
+                        aspect == "precipitation"
+                        and _requires_complete_precipitation_relation(question)
+                        and not relation_quality[0]
+                    ):
+                        # Yaz/kış satırı bir sonraki satırdaki “en fazla
+                        # yağış” bilgisiyle tamamlanabilir. Başka konu veya
+                        # bölüm sınırına kadar biriktirmeye devam et; eksik
+                        # kalırsa bu ilişki hiç kanıt sayılmaz.
+                        continue
                     explicit_climate = int(bool(re.search(
                         r"\b" + re.escape(subject) + r"\w*\s+iklim\w*\b",
                         _normalize_text(body),
                     )))
                     local_value = int(_has_climate_aspect_value(line, aspect))
                     candidates.append((
+                        -relation_quality[0],
+                        -relation_quality[1],
+                        -relation_quality[2],
                         -explicit_climate,
                         -local_value,
                         len(body),
@@ -836,7 +889,7 @@ def _focused_climate_aspect_evidence(question, text, aspect):
                     break
 
         if candidates:
-            relations[subject] = min(candidates)[3]
+            relations[subject] = min(candidates)[6]
 
     if not relations:
         return None
@@ -1146,6 +1199,17 @@ def _source_evidence_quality(question, text):
             phrase = _seasonal_climate_phrase(row, subject, aspect)
             if not phrase:
                 continue
+            relation_quality = (
+                _precipitation_relation_quality(row)
+                if aspect == "precipitation"
+                else (1, 0, 0)
+            )
+            if (
+                aspect == "precipitation"
+                and _requires_complete_precipitation_relation(question)
+                and not relation_quality[0]
+            ):
+                continue
             explicit = int(bool(re.search(
                 r"\b" + re.escape(subject) + r"\w*\s+iklim\w*\b",
                 _normalize_text(row),
@@ -1154,6 +1218,7 @@ def _source_evidence_quality(question, text):
                 len(_mentioned_comparison_subjects(row, subjects)) == 1
             )
             qualities[(aspect, subject)] = (
+                *relation_quality,
                 exclusive,
                 explicit,
                 lexical,
@@ -1548,10 +1613,22 @@ def _structured_comparison_result(question, sources, trace):
             )
             if focus:
                 for subject, row in focus["relations"].items():
-                    aspect_rows[aspect].setdefault(
-                        subject,
-                        (_strip_citations(row), source),
+                    clean_row = _strip_citations(row)
+                    quality = (
+                        _precipitation_relation_quality(clean_row)
+                        if aspect == "precipitation"
+                        else (1, 0, 0)
                     )
+                    if (
+                        aspect == "precipitation"
+                        and _requires_complete_precipitation_relation(question)
+                        and not quality[0]
+                    ):
+                        continue
+                    candidate = (quality, -len(clean_row), clean_row, source)
+                    current = aspect_rows[aspect].get(subject)
+                    if current is None or candidate[:2] > current[:2]:
+                        aspect_rows[aspect][subject] = candidate
 
     if not all(subject in vegetation_rows for subject in subjects):
         return None
@@ -1579,7 +1656,7 @@ def _structured_comparison_result(question, sources, trace):
     for subject in subjects:
         claims = []
         for aspect in aspects:
-            row, source = aspect_rows[aspect][subject]
+            _, _, row, source = aspect_rows[aspect][subject]
             phrase = _seasonal_climate_phrase(row, subject, aspect)
             if not phrase:
                 return None

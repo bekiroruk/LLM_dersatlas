@@ -782,10 +782,26 @@ class APITests(unittest.TestCase):
             "Karadeniz ve diğer nemli kıyı ormanları\n"
             "Yağışla yıkanmış; tuz ve kireç az.",
         )
+        false_seasonal = self.ready_in(
+            geography,
+            "Karadeniz iklimi\nYaz sıcak ve kurak\n"
+            "Kış soğuk ve kar yağışlı.",
+        )
+        incomplete_akdeniz = self.ready_in(
+            geography,
+            "Akdeniz iklimi orta kuşak ve mutlak konumla ilişkilidir; "
+            "en fazla yağış kışın cephelerle düşer.",
+        )
         with self.app.state.sessions() as db:
             distractor_chunks = [
                 db.scalar(select(Chunk).where(Chunk.document_id == document_id)).id
-                for document_id in (flattened, false_water, false_soil)
+                for document_id in (
+                    flattened,
+                    false_water,
+                    false_soil,
+                    false_seasonal,
+                    incomplete_akdeniz,
+                )
             ]
 
         question = (
@@ -823,6 +839,7 @@ class APITests(unittest.TestCase):
         self.assertIn("yaz sıcak ve kurak", result["answer"])
         self.assertNotIn("kış soğuk", result["answer"].casefold())
         self.assertNotIn("Düzensiz Düzenli", result["answer"])
+        self.assertNotIn("mutlak konum", result["answer"].casefold())
 
     def test_reported_seven_question_sequence_is_grounded_end_to_end(self):
         geography = self.owned_subject()

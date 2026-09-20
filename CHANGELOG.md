@@ -4,6 +4,13 @@ Yalnızca gerçekten yapılan değişiklikler kaydedilir. Planlanan özellikler 
 
 ## Unreleased
 
+### Tam yağış rejimi kanıtı — 2026-09-20
+
+- Geniş iklim karşılaştırmasında yalnızca yaz/kış geçen kısa parçalar artık tam yağış rejimi sayılmaz. Kaynakta ya açık düzenli/düzensiz-yıl boyu ilişkisi ya da yaz, kış ve en fazla/az yağış dönemi birlikte bulunmalıdır.
+- Yapılandırılmış cevap kaynak listesindeki ilk eşleşmeyi kullanmak yerine her iklim için en ayrıntılı geçerli ilişkiyi seçer. Bildirilen yanlış Karadeniz satırı ve eksik Akdeniz cümlesi, doğru ayrıntılı satırlar varken cevaba giremez.
+- Tam ilişki bulunamazsa yerel modelin eksik parçaları birleştirmesine izin verilmez; sistem yanlış karşılaştırma yerine kaynak yetersiz sonucuna kapanır.
+- 191 Python testi ve 17 JavaScript arayüz mantığı testi başarılıdır.
+
 ### Düzleştirilmiş PDF tablo güvenliği — 2026-09-20
 
 - PDF metin çıkarımında sütun ilişkisi kaybolmuş `Karadeniz / Akdeniz / karasal` matrisleri artık tek bir iklimin yağış kanıtı sayılmaz.
