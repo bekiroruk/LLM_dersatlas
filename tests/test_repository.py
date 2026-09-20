@@ -163,5 +163,26 @@ class RunnerTests(unittest.TestCase):
                 self.assertEqual(runner.main(), 1)
 
 
+class WindowsLauncherTests(unittest.TestCase):
+    def test_launcher_is_project_scoped_and_revision_checked(self):
+        root = Path(__file__).resolve().parents[1]
+        start = (root / "scripts" / "start.ps1").read_text(encoding="utf-8")
+        stop = (root / "scripts" / "stop.ps1").read_text(encoding="utf-8")
+
+        for script in (start, stop):
+            self.assertIn('Resolve-Path (Join-Path $PSScriptRoot "..")', script)
+            self.assertIn("Get-CimInstance Win32_Process", script)
+            self.assertIn('uvicorn\\s+app\\.main:app', script)
+            self.assertNotIn("Get-Process python", script)
+            self.assertNotIn("taskkill /im python", script.casefold())
+
+        self.assertIn("Set-Location $projectRoot", start)
+        self.assertIn('"-m", "uvicorn", "app.main:app"', start)
+        self.assertIn("/health", start)
+        self.assertIn("rag_revision", start)
+        self.assertIn("Start-Process", start)
+        self.assertIn("Remove-Item $pidFile", stop)
+
+
 if __name__ == "__main__":
     unittest.main()

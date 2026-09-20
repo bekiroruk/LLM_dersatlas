@@ -16,7 +16,7 @@ from .ranking import bm25, reciprocal_rank_fusion
 from .security import search_subject_ids
 
 
-RAG_REVISION = "2026-09-19-source-contract-v10"
+RAG_REVISION = "2026-09-19-source-contract-v11"
 
 
 NO_EVIDENCE = (
@@ -169,6 +169,10 @@ VEGETATION_VALUE_TERMS = (
     "savan",
     "step",
     "tundra",
+)
+VEGETATION_VALUE_PATTERN = re.compile(
+    r"\b(?:" + "|".join(re.escape(term) for term in VEGETATION_VALUE_TERMS)
+    + r")\w*\b"
 )
 
 
@@ -977,6 +981,147 @@ def _focused_vegetation_evidence(question, text):
         "relation_count": relation_total,
         "relations": relations,
     }
+
+
+def _required_evidence_slots(question):
+    """Çok ölçütlü iklim sorusunun cevaplanması için gereken kanıt hücreleri."""
+    subjects = _vegetation_subjects(question)
+    if not subjects:
+        return ()
+
+    slots = []
+    if _asks_about_vegetation(question):
+        slots.extend(("vegetation", subject) for subject in subjects)
+    for aspect in _requested_climate_aspects(question):
+        slots.extend((aspect, subject) for subject in subjects)
+    return tuple(slots)
+
+
+def _source_evidence_quality(question, text):
+    """Bir parçanın hangi açık konu-değer ilişkilerini taşıdığını puanlar."""
+    subjects = _vegetation_subjects(question)
+    if not subjects:
+        return {}
+
+    normalized = _normalize_text(text)
+    candidate_tokens = _tokens(normalized)
+    if not any(_term_in_tokens(subject, candidate_tokens) for subject in subjects):
+        return {}
+
+    vegetation_candidate = bool(
+        _asks_about_vegetation(question)
+        and VEGETATION_VALUE_PATTERN.search(normalized)
+    )
+    aspect_candidates = [
+        aspect for aspect in _requested_climate_aspects(question)
+        if _has_climate_aspect_value(text, aspect)
+    ]
+    if not vegetation_candidate and not aspect_candidates:
+        return {}
+
+    anchors = _question_anchors(question)
+    lexical = _match_count(anchors, text)
+    qualities = {}
+
+    vegetation = (
+        _focused_vegetation_evidence(question, text)
+        if vegetation_candidate else None
+    )
+    if vegetation:
+        for subject in vegetation["covered"]:
+            row = vegetation["relations"][subject]
+            explicit = int(bool(re.search(
+                r"\b(?:dogal\s+)?bitki\s+ortu\w*\b|\bflora\b|"
+                r"\bbaskin\s+gorunum\b",
+                _normalize_text("\n".join((vegetation["text"], row))),
+            )))
+            qualities[("vegetation", subject)] = (
+                vegetation["marker_count"],
+                explicit,
+                vegetation["relation_count"],
+                len(vegetation["covered"]),
+                lexical,
+                -len(row),
+            )
+
+    for aspect in aspect_candidates:
+        focus = _focused_climate_aspect_evidence(question, text, aspect)
+        if not focus:
+            continue
+        for subject in focus["covered"]:
+            row = focus["relations"][subject]
+            explicit = int(bool(re.search(
+                r"\b" + re.escape(subject) + r"\w*\s+iklim\w*\b",
+                _normalize_text(row),
+            )))
+            qualities[(aspect, subject)] = (
+                len(focus["covered"]),
+                explicit,
+                lexical,
+                -len(row),
+            )
+
+    return qualities
+
+
+def _evidence_coverage_keys(question, allowed):
+    """
+    Genel benzerlik sıralamasından bağımsız olarak her gerekli kanıtı bulur.
+
+    ``allowed`` yalnızca ACL ve hazır-belge süzgecinden geçmiş parçalardır.
+    Bu ikinci geçiş, çok sayıda PDF içinde bir ölçütün ilk 30 sonucun dışında
+    kalması yüzünden bütün cevabın rastlantısal biçimde reddedilmesini önler.
+    """
+    required = _required_evidence_slots(question)
+    if not required:
+        return [], 0, 0
+
+    subjects = _vegetation_subjects(question)
+    needs_vegetation = _asks_about_vegetation(question)
+    aspects = _requested_climate_aspects(question)
+
+    best = {}
+    for key, (chunk, _, _) in allowed.items():
+        normalized = _normalize_text(chunk.text)
+        # Ucuz ilk süzgeç: konu ve en az bir gerçek değer adayı olmayan
+        # parçayı ayrıntılı tablo ayrıştırıcısına gönderme.
+        if not any(re.search(r"\b" + re.escape(subject), normalized) for subject in subjects):
+            continue
+        possible_vegetation = bool(
+            needs_vegetation and VEGETATION_VALUE_PATTERN.search(normalized)
+        )
+        possible_aspect = any(
+            _has_climate_aspect_value(chunk.text, aspect)
+            for aspect in aspects
+        )
+        if not possible_vegetation and not possible_aspect:
+            continue
+        qualities = _source_evidence_quality(question, chunk.text)
+        for slot, quality in qualities.items():
+            if slot not in required:
+                continue
+            current = best.get(slot)
+            candidate = (quality, str(key))
+            if current is None or candidate > current:
+                best[slot] = candidate
+
+    ordered = []
+    for slot in required:
+        match = best.get(slot)
+        if match and match[1] not in ordered:
+            ordered.append(match[1])
+    return ordered, len(best), len(required)
+
+
+def _evidence_coverage(question, sources):
+    """Seçilmiş kaynakların gerekli konu-değer hücrelerini kapsamasını ölçer."""
+    required = set(_required_evidence_slots(question))
+    if not required:
+        return 0, 0
+    covered = set()
+    for source in sources:
+        covered.update(_source_evidence_quality(question, source.get("text", "")))
+    return len(required & covered), len(required)
 
 
 def _is_comparison_question(question):
@@ -2466,6 +2611,13 @@ class RAGService:
             for chunk, filename, subject_name in rows
         }
 
+        # Çok parçalı sorularda benzerlik sıralaması tek başına yeterli
+        # değildir: her konu x ölçüt hücresinin en iyi açık kanıtını bütün
+        # izinli parçalarda bir kez bul. Aşağıda bu anahtarlar kaynak bütçesinin
+        # en önüne alınır; ACL, belge durumu ve embedding modeli koşulları
+        # yukarıdaki SQL sorgusunda zaten uygulanmıştır.
+        coverage_keys, _, _ = _evidence_coverage_keys(question, allowed)
+
         search_queries = (
             _retrieval_queries(question)
         )
@@ -2597,6 +2749,10 @@ class RAGService:
         selected_ranked = list(ranked[:search_limit])
         selected_keys = {key for key, _ in selected_ranked}
         ranked_scores = dict(ranked)
+        for key in coverage_keys:
+            if key not in selected_keys:
+                selected_ranked.append((key, ranked_scores.get(key, 0.0)))
+                selected_keys.add(key)
         for lexical in comparison_lexical:
             for key in lexical:
                 if key not in selected_keys:
@@ -2684,6 +2840,13 @@ class RAGService:
         prioritized = []
         seen = set()
 
+        # Kanıt kapsama geçişinin seçtikleri genel sıralama ve top_k
+        # kesmesinden önce gelir. Bir parça birden fazla hücreyi taşıyabilir.
+        for key in coverage_keys:
+            if key in candidate_sources and key not in seen:
+                prioritized.append(candidate_sources[key])
+                seen.add(key)
+
         # Bitki örtüsü tablolarında aynı satırı açıkça taşıyan parçalar,
         # ayrı kategori listelerinden önce gelir.
         if vegetation_queries:
@@ -2720,7 +2883,10 @@ class RAGService:
                 prioritized.append(source)
                 seen.add(source["chunk_id"])
 
-        return prioritized[:self.settings.top_k]
+        # TOP_K genel cevap bütçesidir; zorunlu kanıt parçalarını kesemez.
+        # Model bağlamı ve API sözleşmesi en fazla 10 kaynağı destekler.
+        result_limit = min(10, max(self.settings.top_k, len(coverage_keys)))
+        return prioritized[:result_limit]
 
     def _call_structured(
         self,
@@ -2941,6 +3107,14 @@ class RAGService:
                 "subject_id": subject_id,
             }
         ]
+
+        covered_slots, required_slots = _evidence_coverage(question, sources)
+        if required_slots:
+            trace.append({
+                "tool": "evidence_coverage",
+                "found": covered_slots,
+                "required": required_slots,
+            })
 
         # İlk arama sonuçsuz kalsa da ajan sorguyu yeniden yazabilir. Ancak
         # kapsamda hiç hazır not/izin yoksa boşuna model çağırmaz.

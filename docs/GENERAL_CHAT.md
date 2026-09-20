@@ -4,7 +4,11 @@ Yeni proje veya model indirmeden mevcut kurulum güncellenir. Yüklenmiş notlar
 
 ## Windows güncellemesi
 
-1. Uvicorn loglarının aktığı mevcut terminalde Ctrl+C ile sunucuyu durdur. İkinci bir sunucu açma.
+1. Projeye ait çalışan sunucuyu güvenli biçimde durdur:
+
+```powershell
+.\scripts\stop.ps1
+```
 2. Proje köküne geçip Git durumunu kontrol et ve durdurulmuş verinin yedeğini al:
 
 ```powershell
@@ -28,10 +32,10 @@ Git yerel dosya çakışması/ayrışan geçmiş bildirirse dur; değişiklikler
 ```powershell
 .\.venv\Scripts\python.exe -m compileall -q app scripts tests
 .\.venv\Scripts\python.exe scripts\run_tests.py
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1 --no-access-log
+.\scripts\start.ps1
 ```
 
-Bir kontrol başarısızsa sonraki komutu çalıştırma. Ardından mevcut uygulama sekmesinde Ctrl+F5 ile eski JS/HTML önbelleğini yenile.
+Bir kontrol başarısızsa sonraki komutu çalıştırma. Başlatıcı doğru proje klasörünü, tek Uvicorn sürecini ve çalışan RAG sürümünü denetleyip tarayıcıyı açar. Mevcut eski sekmeyi kullanırsan Ctrl+F5 ile JS/HTML önbelleğini yenile.
 
 ## Kullanım
 
@@ -104,7 +108,7 @@ Yeni DB şeması nullable alanla oluşturulur. Eski SQL Server şemasında otoma
 
 ## Doğrulama sınırı
 
-Son açık gönderme düzeltmesiyle yerel Linux ortamında 122 Python testi ve 15 JavaScript arayüz mantığı testi başarılı. API/depolama testlerinde gerçek SQLite ve gömülü Qdrant, modelde test çifti kullanılır. Kullanıcının bildirdiği iklim takip sorusu, yeniden yazım modelinin çağrılmasını hata sayan bir testle de doğrulanır. Arayüz testleri DOM test çiftidir; gerçek görsel tarayıcı testi değildir. Güncel Linux/Windows otomatik test sonuçları GitHub Actions'ta ayrıca görülür. İlk beş Genel Sohbet senaryosunun başarılı olduğu kullanıcı tarafından bildirildi; ilk gerçek iklim takip sorusunda bağlam çözülemedi. Bu düzeltme sonrası gerçek Ollama ve senin PDF'lerinle tekrar deneme gereklidir.
+Güncel `source-contract-v11` sürümünde 186 Python testi ve 17 JavaScript arayüz mantığı testi başarılı. API/depolama testleri gerçek SQLite ve gömülü Qdrant kullanır; model gereken senaryolarda deterministik test çifti vardır. Kullanıcının yüklediği gerçek bitki PDF'si de gerçek metin çıkarma, parçalama, SQLite ve gömülü Qdrant yolundan geçirilmiştir: bildirilen çok ölçütlü iklim sorusu dört gerekli kanıt hücresinin tamamını bularak yapılandırılmış cevap üretmiştir. Arayüz testleri DOM test çiftidir; gerçek görsel tarayıcı testi değildir. Güncel Windows sonucu uygulama çekilip başlatıldıktan sonra ayrıca görülecektir.
 
 Uygulamada değişiklik yaptıktan sonra gün sonu paylaşımı için [geliştirme rehberi](DEVELOPMENT.md) kullanılır.
 

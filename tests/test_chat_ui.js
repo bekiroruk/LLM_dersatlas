@@ -55,7 +55,7 @@ const context = vm.createContext({
     if (url === '/api/me') data = user;
     else if (url === '/api/subjects') data = availableSubjects;
     else if (url.endsWith('/documents')) data = [];
-    else if (url === '/api/system') data = { model: { reachable: true, chat_ready: true, embed_ready: true }, qdrant_ready: true, max_upload_mb: 20, worker_enabled: true };
+    else if (url === '/api/system') data = { model: { reachable: true, chat_ready: true, embed_ready: true }, qdrant_ready: true, max_upload_mb: 20, worker_enabled: true, rag_revision: '2026-09-19-source-contract-v11', database: 'SQLite', version: '0.1.0', chat_model: 'qwen3:4b', embedding_model: 'bge-m3', vector_mode: 'Qdrant gömülü' };
     else if (url === '/api/dashboard') data = { ready: 3, chunks: 3, query_count: 0, insufficient: 0, p50_ms: null, p95_ms: null, positive_feedback: 0, errors: 0 };
     else if (url === '/api/questions') {
       const body = JSON.parse(options.body); requests.push(body);
@@ -79,6 +79,10 @@ let passed = 0;
 function check(description, test) { test(); passed++; console.log('OK: ' + description); }
 async function main() {
   await new Promise(setImmediate); // Başlangıçtaki sahte API mikro-görevlerini tamamla.
+  check('Çalışan RAG sürümü ana ekranda görünür', () => {
+    assert.ok(get('model-badge').textContent.includes('RAG v11'));
+    assert.ok(get('model-badge').title.includes('source-contract-v11'));
+  });
   check('Varsayılan Genel Sohbet, tüm dersler ve boş doküman seçimi gönderimi engellemez', () => {
     assert.equal(get('page-title').textContent, 'Genel Sohbet');
     assert.equal(get('search-subject-select').value, '');
@@ -157,6 +161,7 @@ async function main() {
     { tool: 'citation_retry', reason: 'unknown_source_ids' },
     { tool: 'citation_validation', reason: 'missing_source_ids' },
     { tool: 'focused_source_excerpt' },
+    { tool: 'evidence_coverage', found: 4, required: 4 },
     { tool: 'structured_evidence_answer' },
     { tool: 'direct_evidence_answer' },
   ];
@@ -178,6 +183,7 @@ async function main() {
     assert.ok(text.includes('Model kendisine verilmeyen bir kaynak numarası kullandı'));
     assert.ok(text.includes('Model kaynak numarası belirtmedi'));
     assert.ok(text.includes('İlgili kaynak satırları doğrudan gösterildi'));
+    assert.ok(text.includes('Sorunun bütün ölçütleri için kanıt kapsaması · 4/4 kanıt'));
     assert.ok(text.includes('Doğrudan kaynak değerinden kısa cevap oluşturuldu'));
     assert.ok(text.includes('Doğrulanmış kaynaklardan karşılaştırma oluşturuldu'));
   });

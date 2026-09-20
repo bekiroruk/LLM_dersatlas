@@ -4,6 +4,14 @@ Yalnızca gerçekten yapılan değişiklikler kaydedilir. Planlanan özellikler 
 
 ## Unreleased
 
+### Kararlı yerel çalışma ve tam kanıt kapsaması — 2026-09-20
+
+- SQLite, Qdrant ve `.env` yolları terminalin açıldığı klasörden bağımsız olarak proje köküne sabitlendi; aynı kurulumun yanlışlıkla ikinci bir boş veri alanı açması engellendi.
+- Çok ölçütlü karşılaştırmalarda her konu ve ölçüt için gereken açık kanıt, genel benzerlik sıralamasından bağımsız olarak bütün yetkili hazır parçalarda aranır. `TOP_K`, bulunan zorunlu kanıtları artık kesmez.
+- Windows başlatıcısı bu projeye ait eski Uvicorn sürecini kapatır, portu denetler, sunucuyu arka planda başlatır ve `/health` üzerinden çalışan RAG sürümünü doğrular. Ayrı güvenli durdurma betiği eklendi.
+- Arayüz çalışan RAG sürümünü ve çok parçalı sorulardaki kanıt kapsamasını gösterir.
+- 186 Python testi ve 17 JavaScript arayüz mantığı testi başarılıdır. Kullanıcının yüklediği gerçek bitki PDF'si, gerçek ayrıştırma/SQLite/gömülü Qdrant akışıyla sınandı; bildirilen iklim sorusu `4/4` kanıtla yapılandırılmış cevap üretti.
+
 ### Karşılaştırma kaynağı kalitesi — 2026-09-19
 
 - Açık iki-konulu takip soruları, her konu için ayrı sözcüksel aramalara bölünür; iki tarafa ait doğrudan kaynaklar genel kategori listelerinden önce sunulur.

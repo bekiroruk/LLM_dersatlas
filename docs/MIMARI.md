@@ -117,7 +117,7 @@ Agent daha yavaş ve daha fazla bellek/hesaplama tüketebilir. Aynı soruyu norm
 | query_metrics | Kullanıcı, ders, süre, sonuç, geri bildirim | İzleme; soru/cevap metni yok |
 | audit_events | İşlemi yapan, işlem, hedef kimliği, zaman | Sınırlı denetim izi; değiştirilemez log değildir |
 
-Bir kullanıcı birçok dersin sahibi olabilir. Bir ders birçok üyeye okuma izni verebilir. Bir belge tek bir derse aittir; bir belgede birçok parça vardır. Aynı belgeyi Coğrafya dersine de yüklersen ayrı bir ders kaydı ve indeks oluşur. “Tüm derslerde ara” bu sürümde yoktur; ders kapsamı bilinçli olarak açık tutulur.
+Bir kullanıcı birçok dersin sahibi olabilir. Bir ders birçok üyeye okuma izni verebilir. Bir belge tek bir derse aittir; bir belgede birçok parça vardır. Aynı belgeyi Coğrafya dersine de yüklersen ayrı bir ders kaydı ve indeks oluşur. Genel Sohbet varsayılan olarak kullanıcının erişebildiği bütün dersleri arar; isteğe bağlı ders filtresi kapsamı tek derse indirir.
 
 ## 8. Dosya yapısı - nereyi açıp inceleyeceksin?
 

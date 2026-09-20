@@ -19,8 +19,9 @@ Ders materyalleri, yerel ortam ayarları, veritabanı ve vektör indeksleri akta
 - Fethedildi/Fethiye yanlış eşleşmesi için hedefli düzeltme yapıldı.
 - Kullanıcı üç hedefli senaryonun beklenen şekilde cevaplandığını bildirdi.
 - Genel Sohbet/ajan/filtre için kullanıcı ilk beş kabul sorusunun beklenen sonucu verdiğini bildirdi.
-- İlk gerçek iklim takip sorusunda bağlam çözülemedi. Açık iki-konu göndermesi için modelden bağımsız, dar bir çözüm ve güvenli ret açıklamaları eklendi; kullanıcı bilgisayarında yeniden deneme bekleniyor.
-- İkinci gerçek iklim denemesinde bağlam başarıyla çözüldü; ancak dağınık kategori parçaları cevap olarak birleştirildi. İki taraflı arama önceliği ve karşılaştırmalarda güvenli yetersiz-kanıt reddi eklendi; yeniden gerçek PDF/Ollama denemesi bekleniyor.
+- Açık iki-konulu takip göndermesi modelden bağımsız çözülür; her cevap için belgelerde yeniden arama yapılır.
+- Çok ölçütlü iklim karşılaştırması için konu × ölçüt kanıt kapsaması eklendi. Benzerlik kısa listesi eksik olsa bile bütün yetkili hazır parçalardan gereken açık kanıtlar seçilir.
+- Veri yolları proje köküne sabitlendi ve Windows başlatıcısı çalışan kodun RAG sürümünü doğrular; yanlış çalışma klasörü veya eski Uvicorn süreci nedeniyle başka veri alanının açılması engellenir.
 
 ## Doğrulama
 
@@ -38,9 +39,11 @@ Açık gönderme düzeltmesiyle toplam 122 Python ve 15 DOM mantık testi yerel 
 
 Karşılaştırma kaynak kalitesi düzeltmesiyle toplam 125 Python ve 15 DOM mantık testi yerel Linux'ta başarılı. Gerçekçi katalog metni cevap olarak reddedildi; iki iklime ait açık kanıt parçalarının önceliği doğrulandı. Bu otomatik sonuç gerçek model doğruluk garantisi değildir.
 
+`source-contract-v11` son doğrulamasında 186 Python ve 17 DOM mantık testi başarılı. Kullanıcının yüklediği gerçek bitki PDF'si gerçek metin çıkarma, SQLite ve gömülü Qdrant üzerinden işlendi; bildirilen çok ölçütlü soru dört gerekli kanıtı bulup yapılandırılmış cevap üretti.
+
 ## Bilinen sınırlamalar
 
-- Yeni takip sorusu akışı gerçek Ollama/PDF'lerle kullanıcı bilgisayarında doğrulanmalı. Hafıza sayfa yenilenince silinir; kalıcı sohbet geçmişi yoktur.
+- Windows'taki güncel `source-contract-v11` çalıştırması son kullanıcı kabulüyle doğrulanmalı. Hafıza sayfa yenilenince silinir; kalıcı sohbet geçmişi yoktur.
 - Genel aramada toplam 30.000 parça koruma sınırı var; aşılırsa ders filtresi kullanılmalı.
 - Eski SQL Server şeması için nullable alan geçişi DBA tarafından ayrıca yapılmalı; bu ortamda SQL Server testi çalıştırılmadı.
 - Islahat Fermanı'nın tarihi gibi sorularda doğru bilgiyi içeren yeni belgenin bulunması ve yeterli cevabın üretilmesi ayrıca doğrulanmalı.
@@ -49,4 +52,4 @@ Karşılaştırma kaynak kalitesi düzeltmesiyle toplam 125 Python ve 15 DOM man
 
 ## Sıradaki adım
 
-Kullanıcı bilgisayarında [takip sorusu kabul denemeleri](GENERAL_CHAT.md#peş-peşe-kabul-denemeleri). Sonrasında ders bazlı etiketli kalite ve gerçek gecikme ölçümleri. Yeni proje ZIP'i veya notları yeniden yükleme gerekli değil.
+Windows kurulumunda güncel kodu çekip `.\scripts\start.ps1` ile `source-contract-v11` sürümünü açmak ve bildirilen iklim sorusunu bir kez çalıştırmak. Yeni proje ZIP'i, doküman yükleme veya yeniden indeksleme gerekli değil.

@@ -684,6 +684,63 @@ class APITests(unittest.TestCase):
         self.assertNotIn("orman yangını hassasiyeti", result["answer"])
         model_call.assert_not_called()
 
+    def test_multipart_evidence_is_recovered_even_when_rankers_miss_it(self):
+        geography = self.owned_subject()
+        vegetation = self.ready_in(
+            geography,
+            "Flora bölgesi Türkiye'de yayılışı Baskın görünüm\n"
+            "Avrupa-Sibirya Marmara'nın kuzeyi ve Karadeniz kıyı kuşağı "
+            "Nemli ormanlar\nAkdeniz\nGüney Marmara, Ege ve Akdeniz "
+            "iklim sahaları\nKızılçam, maki ve kuraklığa dayanıklı "
+            "Akdeniz türleri",
+        )
+        rainfall = self.ready_in(
+            geography,
+            "Yayılış Karadeniz kıyıları Yaz Serin ve yağışlı Kış Ilık ve "
+            "yağışlı En fazla yağış Sonbahar\nYayılış Akdeniz kıyıları "
+            "Yaz Sıcak ve kurak Kış Ilık ve yağışlı En fazla yağış Kış",
+        )
+        distractor = self.ready_in(
+            geography,
+            "Karadeniz ve Akdeniz iklimleri hakkında cevap içermeyen bir "
+            "alıştırma başlığıdır.",
+        )
+        with self.app.state.sessions() as db:
+            distractor_chunk = db.scalar(
+                select(Chunk).where(Chunk.document_id == distractor)
+            ).id
+
+        question = (
+            "Karadeniz ve Akdeniz iklimlerini yağış rejimleri ve doğal "
+            "bitki örtüleri bakımından karşılaştır."
+        )
+        with (
+            patch("app.rag.bm25", return_value=[(distractor_chunk, 999.0)]),
+            patch.object(self.app.state.vectors, "search", return_value=[]),
+            patch.object(
+                self.model,
+                "chat",
+                side_effect=AssertionError("Açık kaynak tablosunda model gerekmemeli"),
+            ),
+        ):
+            result = self.client.post(
+                "/api/questions",
+                json={"question": question, "mode": "rag"},
+                headers=self.headers,
+            ).json()
+
+        self.assertEqual(result["outcome"], "answered")
+        self.assertEqual(result["answer_method"], "structured_evidence")
+        self.assertEqual(
+            {item["document_id"] for item in result["sources"]},
+            {vegetation, rainfall},
+        )
+        self.assertTrue(any(
+            step["tool"] == "evidence_coverage"
+            and step["found"] == step["required"] == 4
+            for step in result["trace"]
+        ))
+
     def test_reported_seven_question_sequence_is_grounded_end_to_end(self):
         geography = self.owned_subject()
         self.ready_in(

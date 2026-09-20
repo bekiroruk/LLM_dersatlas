@@ -1,6 +1,9 @@
 import tempfile
 import unittest
+import os
 from pathlib import Path
+from types import SimpleNamespace
+from app.config import Settings, PROJECT_ROOT
 from app.ranking import tokenize, bm25, reciprocal_rank_fusion
 from app.passwords import hash_password, check_password, token_hash
 from app.citations import valid_citations
@@ -11,12 +14,33 @@ from app.rag import (
     _focused_climate_aspect_evidence,
     _normalize_citation_shapes,
     _retrieval_queries,
+    _evidence_coverage_keys,
 )
 from pypdf import PdfWriter
 from docx import Document as WordDocument
 
 
 class CoreTests(unittest.TestCase):
+    def test_runtime_data_paths_do_not_depend_on_terminal_directory(self):
+        previous = Path.cwd()
+        with tempfile.TemporaryDirectory() as directory:
+            try:
+                os.chdir(directory)
+                settings = Settings(
+                    _env_file=None,
+                    data_dir=Path("data-test-root"),
+                    database_url="sqlite:///./data-test-root/dersatlas.db",
+                )
+            finally:
+                os.chdir(previous)
+
+        expected = (PROJECT_ROOT / "data-test-root").resolve()
+        self.assertEqual(settings.data_dir, expected)
+        self.assertEqual(
+            settings.database_url,
+            "sqlite:///" + (expected / "dersatlas.db").as_posix(),
+        )
+
     def test_comparison_retrieval_splits_both_sides(self):
         question = "Karadeniz ve Akdeniz iklimi açısından bitki örtüsü nasıl farklı?"
         self.assertEqual(
@@ -35,6 +59,61 @@ class CoreTests(unittest.TestCase):
             "Karadeniz ve Akdeniz iklimlerini yağış rejimleri ve doğal "
             "bitki örtüleri bakımından karşılaştır."
         )
+
+    def test_required_evidence_is_found_outside_similarity_shortlist(self):
+        question = (
+            "Karadeniz ve Akdeniz iklimlerini yağış rejimleri ve doğal "
+            "bitki örtüleri bakımından karşılaştır."
+        )
+        allowed = {
+            f"distractor-{index:03d}": (
+                SimpleNamespace(
+                    id=f"distractor-{index:03d}",
+                    text=(
+                        "Karadeniz ve Akdeniz iklim bölgeleri için yağış "
+                        f"ve bitki örtüsü alıştırması {index}."
+                    ),
+                ),
+                f"distractor-{index}.pdf",
+                "Coğrafya",
+            )
+            for index in range(80)
+        }
+        allowed["vegetation-real"] = (
+            SimpleNamespace(
+                id="vegetation-real",
+                text=(
+                    "11. TÜRKİYE'NİN BİTKİ VARLIĞI\n"
+                    "Flora bölgesi Türkiye’de yayılışı Baskın görünüm\n"
+                    "Avrupa-Sibirya Marmara’nın kuzeyi ve Karadeniz kıyı "
+                    "kuşağı Nemli ormanlar\nAkdeniz\nGüney Marmara, Ege, "
+                    "Akdeniz ve Güneydoğu’nun batısına uzanan Akdeniz "
+                    "iklim sahaları\nKızılçam, maki ve kuraklığa dayanıklı "
+                    "Akdeniz türleri"
+                ),
+            ),
+            "4 - TÜRKİYE SU, TOPRAK VE BİTKİ.pdf",
+            "Coğrafya",
+        )
+        allowed["rainfall-real"] = (
+            SimpleNamespace(
+                id="rainfall-real",
+                text=(
+                    "Yayılış Gürcistan sınırından Bulgaristan sınırına kadar "
+                    "Karadeniz kıyıları; Yaz Serin ve yağışlı Kış Ilık ve "
+                    "yağışlı En fazla yağış Sonbahar\nGüney Marmara, Ege "
+                    "kıyıları, Akdeniz kıyıları; Yaz Sıcak ve kurak Kış Ilık "
+                    "ve yağışlı En fazla yağış Kış"
+                ),
+            ),
+            "3 - TÜRKİYE İKLİMİ.pdf",
+            "Coğrafya",
+        )
+
+        keys, covered, required = _evidence_coverage_keys(question, allowed)
+
+        self.assertEqual(keys, ["vegetation-real", "rainfall-real"])
+        self.assertEqual((covered, required), (4, 4))
         self.assertEqual(
             _retrieval_queries(question),
             [

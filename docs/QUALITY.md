@@ -62,3 +62,11 @@ Bu sonuç takip sorusunun arama metninin çözümünü doğrular; gerçek PDF'le
 Bağlam çözümü gerçek denemede çalıştı; ancak bitki örtüsü sorusunda iklim, yer şekli ve kategori listelerini taşıyan geniş PDF parçaları cevap gibi birleştirildi. Bu çıktı doğru atıf biçimine sahip olsa da soruyu anlamlı biçimde yanıtlamadığı için başarısız kabul edildi.
 
 Arama artık iki karşılaştırma tarafı için ayrı sorgular üretir ve konuya özel parçaları katalog satırlarından önce sıralar. Doğrulayıcı kanıtı yetersiz bulursa karşılaştırmalarda extractive fallback kapatılır; sistem dağınık metni göstermek yerine kaynak yetersiz döner. Regresyon kümesi, doğrudan Karadeniz/orman ve Akdeniz/maki parçalarının ilk iki sıraya gelmesini ve yalnızca kategori listesi varken cevap üretilmemesini kapsar. Toplam 125 Python ve 15 DOM mantık testi yerel Linux'ta başarılıdır; gerçek PDF/Ollama tekrarı yine gereklidir.
+
+### Tam kanıt kapsaması ve çalışma klasörü bağımsızlığı — 2026-09-20
+
+Çok ölçütlü sorularda gerekli konu × ölçüt hücreleri, vektör/BM25 kısa listesinin dışında kalsa bile bütün yetkili ve hazır parçalardan seçilir. Regresyon testi iki gerçek kanıtı 80 yüksek benzerlikli dikkat dağıtıcı arasından bulur; API testi sıralayıcıların yalnızca yanlış parçayı döndürdüğü durumda bile dört gerekli hücreyi tamamlar. Göreli SQLite/Qdrant yollarının farklı terminal klasörlerinde farklı veri alanlarına dönüşmemesi ayrıca test edilir.
+
+Windows başlatma betiği yalnızca bu proje köküne ait Uvicorn süreçlerini hedefler ve `/health` yanıtındaki RAG sürümünü kaynak kodla karşılaştırır. Gerçek yüklenmiş bitki PDF'siyle yapılan uçtan uca kabul denemesinde bildirilen Karadeniz/Akdeniz sorusu dört kanıt hücresiyle `structured_evidence` sonucu verdi.
+
+Son doğrulamada 186 Python testi ve 17 JavaScript arayüz mantığı testi başarılıdır. Gerçek PDF kabul denemesi metin çıkarma, parçalama, SQLite ve gömülü Qdrant'ı kapsar; yerel Ollama'nın bütün serbest sorulardaki doğruluğuna ilişkin genel bir garanti değildir.

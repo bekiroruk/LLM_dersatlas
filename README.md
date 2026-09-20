@@ -22,6 +22,16 @@ Uygulamanın güncel kaynak kodu ve geliştirme araçları bu repoda. Uygulama, 
 
 **Genel Sohbet ve takip soruları hazır.** Hafıza yalnızca açık sayfada tutulur; konuşmalar veritabanına kaydedilmez. Mevcut notlarını yeniden yüklemen gerekmez.
 
+## Windows'ta çalıştır
+
+Proje klasöründeki PowerShell'de:
+
+```powershell
+.\scripts\start.ps1
+```
+
+Bu komut yalnızca bu projeye ait eski sunucuyu kapatır, doğru veri klasörünü kullanır, çalışan RAG sürümünü doğrular ve tarayıcıyı açar. Durdurmak için `.\scripts\stop.ps1` çalıştır. İlk kurulum gerekiyorsa önce `.\scripts\setup.ps1` kullan.
+
 ## Belgeler
 
 - [Mimari](docs/ARCHITECTURE.md)
