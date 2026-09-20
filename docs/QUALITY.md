@@ -92,3 +92,19 @@ Regresyonlar bildirilen iki yanlış cümleyi önce verip doğru satırları son
 `source-contract-v14`, kanıt ilişkisi doğru olsa bile kullanıcıya gösterilecek yağış özetini ayrıca cümle bütünlüğü açısından sınırlar. Ek veya kesme işaretiyle başlayan kırpılmış hücreler, `Tuzak / not / uyarı` bölümleri ve virgülden sonra gelen bitki örnekleri yağış cümlesine katılmaz. Mevsim etiketleri ayrı maddelere çevrilir; açık yıl-boyu ve düzenli/düzensiz ilişkileri yalnızca kendi kısa önermeleriyle gösterilir.
 
 Bildirilen `’de azdır ... Tuzak / not ...` Karadeniz metni ile `kış yağışlı; yaz kurak, zeytin, rejim düzensiz` Akdeniz metni birebir regresyon testidir. Son doğrulamada 193 Python testi ve 17 JavaScript arayüz mantığı testi başarılıdır.
+
+## Genel ajan kabul raporu
+
+Sunucu ve Ollama açıkken bütün erişilebilir derslerde ajan değerlendirmesi:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\evaluate.py `
+  --mode agent `
+  --with-generation `
+  --dataset samples\general_evaluation.json `
+  --output output\agent-evaluation.json
+```
+
+Parola komut satırında görünmeden sorulur. `--subject-id` verilmediği için Tarih, Coğrafya ve Vatandaşlık birlikte aranır. Aynı çıktı yolu ikinci kez kullanılmaz; yeni koşu için yeni dosya adı seçilir.
+
+Rapor; kaynaklardaki beklenen kısa metin kapsamını, üretilen cevaptaki kısa metin kapsamını, cevaplanabilir/cevaplanamaz sonuç eşleşmesini ve p50/p95 sürelerini ayrı verir. Bunlar insan doğruluk incelemesinin yerine geçmez. Başlangıç kümesi iki Tarih, iki Coğrafya, iki Vatandaşlık ve iki kaynak-dışı soru içerir.

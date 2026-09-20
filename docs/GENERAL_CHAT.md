@@ -112,6 +112,20 @@ Güncel `source-contract-v14` sürümünde 193 Python testi ve 17 JavaScript ara
 
 Uygulamada değişiklik yaptıktan sonra gün sonu paylaşımı için [geliştirme rehberi](DEVELOPMENT.md) kullanılır.
 
+## Araştırma ajanı kabul testi
+
+Genel kapsam ve gerçek yerel model için tekrarlanabilir sekiz soruluk test komutu:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\evaluate.py `
+  --mode agent `
+  --with-generation `
+  --dataset samples\general_evaluation.json `
+  --output output\agent-evaluation.json
+```
+
+Komut parolayı güvenli biçimde sorar ve kişisel dokümanları rapora kopyalamaz; yalnızca seçilen kaynak metinleri üzerindeki kısa doğrulama parçalarının bulunma oranını, cevap sonucunu, kullanılan ders adlarını ve süreleri kaydeder. Rapor GitHub'a gönderilmez.
+
 ## Teknik dayanaklar
 
 Yetkili derslerin birleşimi Qdrant MatchAny filtresiyle aranır; boş izin listesi filtresiz aramaya dönüşmez. [Qdrant filtreleme](https://qdrant.tech/documentation/search/filtering/).

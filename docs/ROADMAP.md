@@ -43,11 +43,12 @@ Kabul: önceki bir cevabı değiştiren takip sorusu çalışır; kaynak etiketl
 
 ## 3. Kalite değerlendirmesi
 
-- [ ] Her ders için etiketli sorular ve doğru kaynak parçaları.
-- [ ] Yazım varyantları, yanlış öncül ve konu dışı sorular.
+- [x] Her ders için başlangıç etiketli sorular ve beklenen doğrulama parçaları.
+- [ ] Yazım varyantlarını genişletmek; yanlış öncül ve konu dışı başlangıç soruları hazır.
 - [ ] Soru tekrarını cevap saymayan kontroller.
-- [ ] Kaynak bulunmasına rağmen cevap verilememe durumlarını ölçmek.
-- [ ] Recall@k, cevap doğruluğu, kaynak desteği ve reddetme başarısını ayrı raporlamak.
+- [x] Kaynak bulunmasına rağmen cevap verilememe durumunu sonuç bazında kaydetmek.
+- [x] Kaynak kapsaması, cevap kapsaması, çekimserlik başarısı ve gecikmeyi ayrı raporlamak.
+- [ ] Başlangıç kümesini gerçek yerel model ve kişisel notlarla çalıştırıp insan değerlendirmesini eklemek.
 
 Kabul: ölçümlerde payda, soru kümesi, model sürümü ve donanım belirtilir; arama puanı doğruluk olasılığı olarak sunulmaz.
 

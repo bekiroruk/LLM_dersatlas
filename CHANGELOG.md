@@ -4,6 +4,13 @@ Yalnızca gerçekten yapılan değişiklikler kaydedilir. Planlanan özellikler 
 
 ## Unreleased
 
+### Genel ajan kabul ölçümü — 2026-09-20
+
+- `scripts/evaluate.py` artık ders filtresi olmadan tüm erişilebilir notlarda hem `rag` hem `agent` modunu ölçer. Ajan modu gerçek cevap üretimi olmadan çalıştırılamaz.
+- Tarih, Coğrafya, Vatandaşlık ve iki kaynak-dışı sorudan oluşan `samples/general_evaluation.json` başlangıç kabul kümesi eklendi.
+- Kaynak metni kapsaması, cevap metni kapsaması, cevaplanabilirlik/çekimserlik başarısı ve p50/p95 süreleri ayrı raporlanır; kısa metin eşleşmesi doğruluk olasılığı olarak sunulmaz.
+- Değerlendirme veri sözleşmesi, Türkçe büyük/küçük harf eşleşmesi, yüzdelik hesabı ve metrik ayrımı test edildi. 197 Python testi ve 17 JavaScript arayüz mantığı testi başarılıdır.
+
 ### Parçalı yağış cümlesi temizliği — 2026-09-20
 
 - Yapılandırılmış iklim cevabı, PDF/OCR parçasının ortasından başlayan `’de azdır` benzeri eksik hücreleri ve `Tuzak / not` açıklamalarını artık kullanıcı yanıtına taşımaz.

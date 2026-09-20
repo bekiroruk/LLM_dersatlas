@@ -32,6 +32,14 @@ Proje klasöründeki PowerShell'de:
 
 Bu komut yalnızca bu projeye ait eski sunucuyu kapatır, doğru veri klasörünü kullanır, çalışan RAG sürümünü doğrular ve tarayıcıyı açar. Durdurmak için `.\scripts\stop.ps1` çalıştır. İlk kurulum gerekiyorsa önce `.\scripts\setup.ps1` kullan.
 
+Gerçek yerel modelle üç derslik araştırma ajanı kabul raporu üretmek için sunucu açıkken:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\evaluate.py --mode agent --with-generation --dataset samples\general_evaluation.json --output output\agent-evaluation.json
+```
+
+Parola ekranda görünmeden sorulur. Üretilen yerel rapor GitHub'a eklenmez.
+
 ## Belgeler
 
 - [Mimari](docs/ARCHITECTURE.md)

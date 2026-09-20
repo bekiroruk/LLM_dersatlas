@@ -1,43 +1,50 @@
-# Doğrulama raporu - 10 Eylül 2026
+# Doğrulama raporu — 20 Eylül 2026
 
 ## Sonuç
 
-**20 çekirdek testi geçti. 18 API/entegrasyon testi atlandı.** Atlanan testler başarılı sayılmamıştır. Kaynak kodu sözdizimi kontrolleri geçti. Gerçek LLM doğruluğu, uçtan uca çalışma, Docker ve SQL Server bu ortamda doğrulanmadı.
+Yerel Linux/Python 3.12 ortamında **197 Python testi** ve **17 JavaScript arayüz mantığı testi** başarılıdır. Python testlerinde atlama başarı sayılmaz. Sözdizimi ve paylaşım kapsamı kontrolleri de geçmiştir.
 
-## Çalıştırılan kontroller
+Kullanıcının Windows/Ollama kabulünde `source-contract-v14`, bildirilen Karadeniz–Akdeniz yağış ve bitki örtüsü karşılaştırmasını doğru, temiz ve kaynaklı üretmiştir.
 
-| Kontrol | Sonuç | Ne gösterir? |
+## Doğrulanan alanlar
+
+| Alan | Sonuç | Kapsam |
 | --- | --- | --- |
-| `python -m unittest discover -s tests -v` | 38 test keşfedildi; 20 başarılı, 18 atlandı | Ayrıştırma/arama temel mantığı çalışıyor; API sonucu yok |
-| `python -m compileall -q app scripts tests` | Başarılı | Python dosyalarının sözdizimi geçerli |
-| `node --check dist/assets/app.js` | Başarılı | Arayüz JavaScript sözdizimi geçerli |
-| Gerçek Ollama ve embedding | Çalıştırılmadı | Model ağırlığı/servisi bulunmuyor |
-| Docker Compose ve GPU | Çalıştırılmadı | Docker/GPU ortamı bulunmuyor |
-| SQL Server | Çalıştırılmadı | SQL Server/ODBC ortamı bulunmuyor |
-| Tarayıcı / görsel / uçtan uca UI testi | Çalıştırılmadı | Etkileşimli tarayıcı doğrulaması yapılmadı |
-| WebMCP | Çalıştırılmadı | Destekleyen izinli tarayıcı bağlamı yok; temel uygulama için zorunlu değil |
+| API ve oturum güvenliği | Başarılı | Kimlik doğrulama, CSRF/origin, rol ve kaynak erişimi |
+| Çok dersli genel arama | Başarılı | Sahiplik/üyelik birleşimi, isteğe bağlı ders filtresi, yetki iptali |
+| RAG kaynak sözleşmesi | Başarılı | Kaynaksız çekimserlik, atıf doğrulama, yanlış kaynak reddi |
+| Araştırma ajanı | Başarılı | Yalnızca `search_notes`, kapsam aşımı/yazma/shell/ağ/SQL reddi, tur sınırı |
+| Sohbet bağlamı | Başarılı | 4 tur/6000 karakter, takip sorusu, kapsam değişimi, temizleme |
+| İklim karşılaştırması regresyonu | Başarılı | Bozuk PDF tablosu, eksik ilişki, kırpılmış hücre ve sınav notu temizliği |
+| Depolama ve geçiş | Başarılı | SQLite şema geçişi, rollback, yedek hatası ve Qdrant yetki filtresi |
+| Depo güvenliği | Başarılı | İzinli yollar, büyük dosya/secret biçimleri, indeks ve başlatıcı kontrolleri |
+| Arayüz mantığı | 17/17 | Genel kapsam, filtre, ajan, hafıza, gecikmiş yanıt ve kaynak gösterimi |
 
-FastAPI, SQLAlchemy, HTTPX, Qdrant istemcisi ve diğer API bağımlılıklarını yükleme girişimi ağ izin engeline takıldı. Yetki sınırı aşılmadı; testler mevcut kitaplıklarla ayrıştırılabilen çekirdek katmanla sınırlı tutuldu.
+## Gerçek model kabul aracı
 
-## Geçen çekirdek testleri
+`samples/general_evaluation.json`, Tarih, Coğrafya, Vatandaşlık ve kaynak-dışı sorulardan oluşan sekiz soruluk başlangıç kümesidir. Aşağıdaki komut gerçek yerel Ollama modeliyle genel ajan raporu üretir:
 
-Türkçe I/İ normalizasyonu; tarihle BM25 eşleşmesi; eşleşme bulunmaması; durak sözcükler; RRF sıralama birleşimi; kaynak konumunu koruyan parçalama; uzun sözcük/örtüşme; hatalı parça ayarı; metin temizliği; UTF-8 okuma; hatalı kodlama reddi; metinsiz PDF/OCR uyarısı; DOCX tablo konumu; tuzlu parola hash'i ve doğrulama; parola uzunluğu; token hash'i; geçerli kaynak; bilinmeyen kaynak reddi; metinde kaynak olmaması; metin/metadata kaynak uyumsuzluğu.
+```powershell
+.\.venv\Scripts\python.exe scripts\evaluate.py `
+  --mode agent `
+  --with-generation `
+  --dataset samples\general_evaluation.json `
+  --output output\agent-evaluation.json
+```
 
-## Hazırlanan fakat çalıştırılamayan API testleri
+Rapor şu ölçüleri ayrı tutar:
 
-Oturumsuz erişim; CSRF başlığı; çapraz Origin; dersler arası izolasyon; yükleme/işleme/RAG; aynı belge tekrarı; dosya türü; istek boyutu; kaynaksız çekimserlik; uydurma kaynak reddi; model kesintisi; yarım indeksli belgenin dışlanması; silinen kaynağın dışlanması; dosya indirme yetkisi; öğrenci okuma/yazma ayrımı; agent'in shell aracını reddetmesi; geri bildirim sahipliği; logout sonrası oturumun iptali.
+- kaynak metninde beklenen kısa parçaların kapsaması;
+- cevap metninde beklenen kısa parçaların kapsaması;
+- cevaplanabilirlik/çekimserlik sonucu eşleşmesi;
+- sorgu p50 ve p95 süresi;
+- seçilen kaynakların dersleri ve sayısı.
 
-API testlerinde embedding/LLM cevabı test çiftidir. Bu testlerin ileride geçmesi bile gerçek modelin tarih bilgisi veya kaynak sadakati kalitesini kanıtlamaz. Gerçek Ollama değerlendirmesi ayrı yürütülür.
+Kısa metin eşleşmesi semantik doğruluk veya doğruluk olasılığı değildir. Her cevap ve kaynak insan tarafından ayrıca incelenmelidir.
 
-## Yerel kabul ölçütleri
+## Sınırlar
 
-1. Tüm bağımlılıklar yüklüyken 38 test geçmeli, 0 atlama olmalı.
-2. Model durumu, embedding ve Qdrant hazır görünmeli.
-3. Örnek not yüklenip işlenmeli; kaynak konumu doğru açılmalı.
-4. Kendi üç tarih dosyanla en az 30 soru insan denetiminden geçmeli. Sayısal hedefler gözlenen başlangıç seviyesine göre belirlenecek.
-5. Başka ders ve kullanıcıdan kaynak sızıntısı olmamalı.
-6. Model durdurulduğunda sahte cevap değil açık hizmet hatası görünmeli.
-7. Yeniden başlatma ve yedek geri yükleme sonrası belgeler ve kaynak referansları korunmalı.
-8. Mobil ve masaüstü tarayıcıda giriş, yükleme, ders değişimi, silme onayı ve klavye kullanımı kontrol edilmeli.
-
-Bu kapılar tamamlanmadan README'deki “yerel doğrulama adayı” ibaresi kaldırılmamalı.
+- CI, deterministik model test çifti kullanır; gerçek Qwen yanıt kalitesini kanıtlamaz.
+- Arayüz kontrolleri DOM mantık testidir; görsel tarayıcı ve mobil uyumluluk testi değildir.
+- SQL Server/ODBC, Docker GPU ve OCR üretim senaryoları bu koşuda çalıştırılmadı.
+- Kişisel PDF'ler, veritabanı, Qdrant verisi ve yerel değerlendirme çıktıları GitHub'a gönderilmez.
