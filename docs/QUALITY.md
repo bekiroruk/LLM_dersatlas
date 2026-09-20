@@ -70,3 +70,11 @@ Arama artık iki karşılaştırma tarafı için ayrı sorgular üretir ve konuy
 Windows başlatma betiği yalnızca bu proje köküne ait Uvicorn süreçlerini hedefler ve `/health` yanıtındaki RAG sürümünü kaynak kodla karşılaştırır. Gerçek yüklenmiş bitki PDF'siyle yapılan uçtan uca kabul denemesinde bildirilen Karadeniz/Akdeniz sorusu dört kanıt hücresiyle `structured_evidence` sonucu verdi.
 
 Son doğrulamada 186 Python testi ve 17 JavaScript arayüz mantığı testi başarılıdır. Gerçek PDF kabul denemesi metin çıkarma, parçalama, SQLite ve gömülü Qdrant'ı kapsar; yerel Ollama'nın bütün serbest sorulardaki doğruluğuna ilişkin genel bir garanti değildir.
+
+### Düzleştirilmiş tablo ve komşu satır ilişkisi — 2026-09-20
+
+Gerçek kullanıcı çıktısında çok sütunlu iklim tablosu düz metne dönüşürken başlık ve değerlerin sütun bağı kayboldu; “yaz sıcak ve kurak / kış soğuk ve kar yağışlı” satırları yanlışlıkla Karadeniz'e, karışık matris değerleri Akdeniz'e atandı. Gerçek PDF kabul denemesi ayrıca bir toprak satırındaki “yağışla yıkanmış” ifadesinin Karadeniz yağış rejimi, yeraltı suyu tablosundaki “rejimi düzensiz” ifadesinin Akdeniz yağış rejimi sanılabildiğini gösterdi.
+
+`source-contract-v12` aynı parçada birden fazla karşılaştırma başlığı bulunan matrisleri reddeder ve iklim adıyla yağış değeri arasında açık iklim cümlesi, açık yağış etiketi veya aynı satırdaki yaz/kış ilişkisini zorunlu kılar. Regresyonlar üç gerçek PDF dikkat dağıtıcısını, bildirilen bozuk matrisi, geçerli mevsim tablosunu ve geçerli açık iklim cümlelerini birlikte kapsar.
+
+Son doğrulamada 189 Python testi ve 17 JavaScript arayüz mantığı testi başarılıdır. Kullanıcının gerçek bitki PDF'siyle yapılan uçtan uca denemede arama bilerek bozuk matrise yöneltildi; kapsam taraması yine doğru yağış satırlarıyla PDF sayfa 11'deki bitki tablosunu seçti ve `structured_evidence` cevabında yanlış parçaları kullanmadı.

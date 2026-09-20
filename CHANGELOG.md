@@ -4,6 +4,13 @@ Yalnızca gerçekten yapılan değişiklikler kaydedilir. Planlanan özellikler 
 
 ## Unreleased
 
+### Düzleştirilmiş PDF tablo güvenliği — 2026-09-20
+
+- PDF metin çıkarımında sütun ilişkisi kaybolmuş `Karadeniz / Akdeniz / karasal` matrisleri artık tek bir iklimin yağış kanıtı sayılmaz.
+- İklim adıyla yağış değeri arasında açık ilişki zorunlu kılındı. Yakındaki toprak açıklamasındaki “yağışla yıkanmış”, yeraltı suyu tablosundaki “rejimi düzensiz” ve yamaç yağışı iklim rejimine bağlanmaz.
+- Geçerli açık cümleler ile `Yaz / Kış / En fazla yağış` satırları kabul edilmeye devam eder; yapılandırılmış cevap her iklimin yağış ve bitki örtüsü hücrelerini ayrı kaynak ilişkilerinden kurar.
+- 189 Python testi ve 17 JavaScript arayüz mantığı testi başarılıdır. Kullanıcının gerçek bitki PDF'si, doğru yağış satırları ve bildirilen bozuk matris aynı gerçek SQLite/gömülü Qdrant akışında sınandı; sonuç doğru iki kaynağı seçti ve bozuk parçaları dışarıda bıraktı.
+
 ### Kararlı yerel çalışma ve tam kanıt kapsaması — 2026-09-20
 
 - SQLite, Qdrant ve `.env` yolları terminalin açıldığı klasörden bağımsız olarak proje köküne sabitlendi; aynı kurulumun yanlışlıkla ikinci bir boş veri alanı açması engellendi.

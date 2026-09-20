@@ -16,7 +16,7 @@ from .ranking import bm25, reciprocal_rank_fusion
 from .security import search_subject_ids
 
 
-RAG_REVISION = "2026-09-19-source-contract-v11"
+RAG_REVISION = "2026-09-20-source-contract-v12"
 
 
 NO_EVIDENCE = (
@@ -699,6 +699,80 @@ def _has_climate_aspect_value(text, aspect):
     return bool(summer_dry and winter_rainy)
 
 
+def _mentioned_comparison_subjects(text, subjects):
+    """Bir kanıt parçasında gerçekten geçen karşılaştırma tarafları."""
+    tokens = _tokens(text)
+    return tuple(
+        subject for subject in subjects
+        if _term_in_tokens(subject, tokens)
+    )
+
+
+def _precipitation_matrix_is_ambiguous(text):
+    """PDF'de sütunları kaymış karşılaştırma matrislerini cevap saymaz."""
+    normalized = _normalize_text(text)
+
+    # Tek iklim satırında aynı etiket birden çok kez bulunmaz. Bu görünüm,
+    # birden fazla sütunun satır sırası kaybolarak art arda çıkarıldığını
+    # gösterir.
+    for pattern in (
+        r"\byagis\s+rejim\w*\b",
+        r"\ben\s+fazla\s+yagis\w*\b",
+        r"\ben\s+az\s+yagis\w*\b",
+    ):
+        if len(re.findall(pattern, normalized)) > 1:
+            return True
+
+    # "Düzensiz Düzenli Düzensiz" ve "Belirgin Yok ..." gibi karşıt
+    # sütun değerleri tek bir iklime ait ilişki olarak yorumlanamaz.
+    if re.search(r"\bduzenli\w*\b", normalized) and re.search(
+        r"\bduzensiz\w*\b", normalized
+    ):
+        return True
+    if normalized.count("belirgin") >= 2 and re.search(r"\byok\b", normalized):
+        return True
+
+    numeric_cells = re.findall(r"\b\d+(?:[-.,]\d+)?\b", normalized)
+    column_words = re.findall(r"\b(?:ustu|alti|cevresi|belirgin|yok)\b", normalized)
+    return len(numeric_cells) >= 3 and len(column_words) >= 3
+
+
+def _climate_relation_is_ambiguous(text, subject, subjects, aspect):
+    """Konu ile değer arasındaki ilişki tek bir satıra indirgenebilmeli."""
+    mentioned = _mentioned_comparison_subjects(text, subjects)
+    if not any(_same_term(subject, known) for known in mentioned):
+        return True
+    if len(mentioned) != 1:
+        return True
+    if aspect != "precipitation":
+        return False
+    if _precipitation_matrix_is_ambiguous(text):
+        return True
+
+    normalized = _normalize_text(text)
+    explicit_climate = bool(re.search(
+        r"\b" + re.escape(subject) + r"\w*(?:\s+\w+){0,2}\s+iklim\w*\b",
+        normalized,
+    ))
+    explicit_rainfall_label = bool(re.search(
+        r"\b(?:yagis\s+rejim\w*|en\s+(?:fazla|az)\s+yagis\w*|"
+        r"her\s+mevsim\w*\s+yagis\w*|yil\s+boyu\w*\s+yagis\w*|"
+        r"yagis\w*\s+yil\s+boyu\w*)\b",
+        normalized,
+    ))
+    seasonal_row = bool(
+        re.search(r"\byaz\w*\b", normalized)
+        and re.search(r"\bkis\w*\b", normalized)
+        and re.search(r"\b(?:yagis\w*|kurak\w*)\b", normalized)
+    )
+
+    # Konu adıyla iklim/yağış ilişkisi açık değilse yakındaki herhangi bir
+    # "rejim", "az" veya "yağış" ifadesini o iklime bağlama. PDF sayfa
+    # metninde deniz adından yeraltı suyu tablosuna ya da toprak satırından
+    # "yağışla yıkanmış" açıklamasına atlamak bu sınıfa girer.
+    return not (explicit_climate or explicit_rainfall_label or seasonal_row)
+
+
 def _focused_climate_aspect_evidence(question, text, aspect):
     """Bir iklim boyutunu her karşılaştırma tarafıyla aynı bölümde bulur."""
     subjects = _vegetation_subjects(question)
@@ -714,6 +788,12 @@ def _focused_climate_aspect_evidence(question, text, aspect):
 
         for index, line in enumerate(lines):
             if not _term_in_tokens(subject, _tokens(line)):
+                continue
+            # Yan yana çıkarılmış tablo başlıkları (örn. "Karadeniz Akdeniz
+            # Karasal") hangi değerin hangi sütuna ait olduğunu taşımaz.
+            # Böyle bir satırdan aşağı doğru değer devşirmek yanlış iklimi
+            # seçer; yalnızca tek tarafı açıkça gösteren başlangıcı kabul et.
+            if len(_mentioned_comparison_subjects(line, subjects)) != 1:
                 continue
 
             body_parts = []
@@ -735,15 +815,28 @@ def _focused_climate_aspect_evidence(question, text, aspect):
                 body_parts.append(lines[end])
                 body = " ".join(body_parts).strip()
                 if _has_climate_aspect_value(body, aspect):
+                    if _climate_relation_is_ambiguous(
+                        body,
+                        subject,
+                        subjects,
+                        aspect,
+                    ):
+                        break
                     explicit_climate = int(bool(re.search(
                         r"\b" + re.escape(subject) + r"\w*\s+iklim\w*\b",
                         _normalize_text(body),
                     )))
-                    candidates.append((-explicit_climate, len(body), body))
+                    local_value = int(_has_climate_aspect_value(line, aspect))
+                    candidates.append((
+                        -explicit_climate,
+                        -local_value,
+                        len(body),
+                        body,
+                    ))
                     break
 
         if candidates:
-            relations[subject] = min(candidates)[2]
+            relations[subject] = min(candidates)[3]
 
     if not relations:
         return None
@@ -1050,15 +1143,22 @@ def _source_evidence_quality(question, text):
             continue
         for subject in focus["covered"]:
             row = focus["relations"][subject]
+            phrase = _seasonal_climate_phrase(row, subject, aspect)
+            if not phrase:
+                continue
             explicit = int(bool(re.search(
                 r"\b" + re.escape(subject) + r"\w*\s+iklim\w*\b",
                 _normalize_text(row),
             )))
+            exclusive = int(
+                len(_mentioned_comparison_subjects(row, subjects)) == 1
+            )
             qualities[(aspect, subject)] = (
-                len(focus["covered"]),
+                exclusive,
                 explicit,
                 lexical,
                 -len(row),
+                -len(focus["covered"]),
             )
 
     return qualities
@@ -1327,6 +1427,8 @@ def _seasonal_climate_phrase(row, subject, aspect):
     """Kaynak satırındaki iklim değerlerini yorum katmadan düzenler."""
     row = _strip_citations(row)
     if aspect == "precipitation":
+        if _precipitation_matrix_is_ambiguous(row):
+            return ""
         labels = (
             ("yaz", r"\byaz\b"),
             ("kış", r"\b(?:k[ıi]ş|kis)\b"),
@@ -1356,7 +1458,8 @@ def _seasonal_climate_phrase(row, subject, aspect):
                 parts.append(f"{label}{separator}{value}")
         found_labels = {label for _, _, label in found}
         if {"yaz", "kış"}.issubset(found_labels) and parts:
-            return "; ".join(parts)
+            phrase = "; ".join(parts)
+            return phrase if len(phrase.split()) <= 36 else ""
 
     words = list(re.finditer(r"[^\W\d_]+", row, flags=re.UNICODE))
     start = None
@@ -1378,6 +1481,15 @@ def _seasonal_climate_phrase(row, subject, aspect):
             phrase,
             flags=re.IGNORECASE | re.UNICODE,
         )
+        if (
+            # Başta bulunan "yağış" etiketi okunabilir cevapta tekrar
+            # etmesin diye yukarıda atılır. Kanıt doğrulamasını etiketi
+            # atılmış özet üzerinde değil, özgün ilişki satırında yap.
+            not _has_climate_aspect_value(row, aspect)
+            or len(phrase.split()) > 36
+            or _precipitation_matrix_is_ambiguous(phrase)
+        ):
+            return ""
     return phrase
 
 

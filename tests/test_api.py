@@ -741,6 +741,89 @@ class APITests(unittest.TestCase):
             for step in result["trace"]
         ))
 
+    def test_flattened_climate_matrix_cannot_replace_real_rainfall_rows(self):
+        geography = self.owned_subject()
+        vegetation = self.ready_in(
+            geography,
+            "Flora bölgesi Türkiye'de yayılışı Baskın görünüm\n"
+            "Avrupa-Sibirya Karadeniz kıyı kuşağı Nemli ormanlar\n"
+            "Akdeniz Akdeniz iklim sahaları Kızılçam, maki ve kuraklığa "
+            "dayanıklı Akdeniz türleri",
+        )
+        karadeniz = self.ready_in(
+            geography,
+            "Yayılış Karadeniz kıyıları Yaz Serin ve yağışlı Kış Ilık "
+            "ve yağışlı En fazla yağış Sonbahar",
+        )
+        akdeniz = self.ready_in(
+            geography,
+            "Yayılış Akdeniz kıyıları Yaz Sıcak ve kurak Kış Ilık ve "
+            "yağışlı En fazla yağış Kış",
+        )
+        flattened = self.ready_in(
+            geography,
+            "İklim tipi Karadeniz Akdeniz Sert karasal\n"
+            "Yaz sıcak ve kurak\nKış soğuk ve kar yağışlı\n"
+            "Kış sıcaklığı 0 üstü yaklaşık 8-10 0 üstü yaklaşık 5 "
+            "0 çevresi/altı Belirgin eksi\n"
+            "Yaz kuraklığı Belirgin Yok Belirgin Yok\n"
+            "Yağış rejimi Düzensiz Düzenli Düzensiz Düzensiz",
+        )
+        false_water = self.ready_in(
+            geography,
+            "Akdeniz Antalya, Mersin, İskenderun\n"
+            "Fethiye Körfezi Ege-Akdeniz geçiş alanında yorumlanabilir.\n"
+            "YERALTI SULARI VE KAYNAKLAR\n"
+            "Vadi-yamaç kaynağı Yağıştan beslenir; rejimi düzensizdir.",
+        )
+        false_soil = self.ready_in(
+            geography,
+            "Kahverengi orman Orman örtüsü altında; özellikle\n"
+            "Karadeniz ve diğer nemli kıyı ormanları\n"
+            "Yağışla yıkanmış; tuz ve kireç az.",
+        )
+        with self.app.state.sessions() as db:
+            distractor_chunks = [
+                db.scalar(select(Chunk).where(Chunk.document_id == document_id)).id
+                for document_id in (flattened, false_water, false_soil)
+            ]
+
+        question = (
+            "Karadeniz ve Akdeniz iklimlerini yağış rejimleri ve doğal "
+            "bitki örtüleri bakımından karşılaştır."
+        )
+        with (
+            patch(
+                "app.rag.bm25",
+                return_value=[
+                    (chunk_id, 999.0 - index)
+                    for index, chunk_id in enumerate(distractor_chunks)
+                ],
+            ),
+            patch.object(self.app.state.vectors, "search", return_value=[]),
+            patch.object(
+                self.model,
+                "chat",
+                side_effect=AssertionError("Açık kaynak tablosunda model gerekmemeli"),
+            ),
+        ):
+            result = self.client.post(
+                "/api/questions",
+                json={"question": question, "mode": "rag"},
+                headers=self.headers,
+            ).json()
+
+        self.assertEqual(result["outcome"], "answered")
+        self.assertEqual(result["answer_method"], "structured_evidence")
+        self.assertEqual(
+            {item["document_id"] for item in result["sources"]},
+            {vegetation, karadeniz, akdeniz},
+        )
+        self.assertIn("yaz serin ve yağışlı", result["answer"])
+        self.assertIn("yaz sıcak ve kurak", result["answer"])
+        self.assertNotIn("kış soğuk", result["answer"].casefold())
+        self.assertNotIn("Düzensiz Düzenli", result["answer"])
+
     def test_reported_seven_question_sequence_is_grounded_end_to_end(self):
         geography = self.owned_subject()
         self.ready_in(

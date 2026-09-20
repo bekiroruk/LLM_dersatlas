@@ -15,6 +15,7 @@ from app.rag import (
     _normalize_citation_shapes,
     _retrieval_queries,
     _evidence_coverage_keys,
+    _seasonal_climate_phrase,
 )
 from pypdf import PdfWriter
 from docx import Document as WordDocument
@@ -166,6 +167,67 @@ class CoreTests(unittest.TestCase):
             with self.subTest(text=text):
                 self.assertIsNone(
                     _focused_climate_aspect_evidence(question, text, "precipitation")
+                )
+
+    def test_flattened_climate_matrix_is_not_assigned_to_either_subject(self):
+        question = (
+            "Karadeniz ve Akdeniz iklimlerini yağış rejimleri ve doğal "
+            "bitki örtüleri bakımından karşılaştır."
+        )
+        flattened = (
+            "İklim tipi Karadeniz Akdeniz Sert karasal\n"
+            "Yaz sıcak ve kurak\n"
+            "Kış soğuk ve kar yağışlı\n"
+            "Kış sıcaklığı 0 üstü yaklaşık 8-10 0 üstü yaklaşık 5 "
+            "0 çevresi/altı Belirgin eksi\n"
+            "Yaz kuraklığı Belirgin Yok Belirgin Yok\n"
+            "Yağış rejimi Düzensiz Düzenli Düzensiz Düzensiz"
+        )
+
+        self.assertIsNone(
+            _focused_climate_aspect_evidence(
+                question,
+                flattened,
+                "precipitation",
+            )
+        )
+        self.assertEqual(
+            _seasonal_climate_phrase(
+                "Akdeniz iklimi Kış sıcaklığı 0 üstü yaklaşık 8-10 "
+                "0 üstü yaklaşık 5 0 çevresi/altı Belirgin eksi "
+                "Yaz kuraklığı Belirgin Yok Belirgin Yok Yağış rejimi "
+                "Düzensiz Düzenli Düzensiz Düzensiz",
+                "akdeniz",
+                "precipitation",
+            ),
+            "",
+        )
+
+    def test_nearby_soil_water_and_slope_rainfall_are_not_climate_regimes(self):
+        question = (
+            "Karadeniz ve Akdeniz iklimlerini yağış rejimleri ve doğal "
+            "bitki örtüleri bakımından karşılaştır."
+        )
+        unrelated = (
+            "Akdeniz Antalya, Mersin, İskenderun\n"
+            "Fethiye Körfezi Ege-Akdeniz geçiş alanında yorumlanabilir.\n"
+            "YERALTI SULARI VE KAYNAKLAR\n"
+            "Vadi-yamaç kaynağı Yağıştan beslenir; rejimi düzensizdir.",
+            "Kahverengi orman Orman örtüsü altında; özellikle\n"
+            "Karadeniz ve diğer nemli kıyı ormanları\n"
+            "Yağışla yıkanmış; tuz ve kireç az.",
+            "Doğu Karadeniz kuzey yamacı Karadeniz'e dönüktür; nemli hava "
+            "yükselip bol yağış bırakır. Güney yamaçta yağış azalır.",
+        )
+
+        for text in unrelated:
+            with self.subTest(text=text):
+                self.assertIsNone(
+                    _focused_climate_aspect_evidence(
+                        question,
+                        text,
+                        "precipitation",
+                    )
                 )
 
     def test_vegetation_table_row_is_kept_as_one_evidence_relation(self):

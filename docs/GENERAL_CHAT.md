@@ -108,7 +108,7 @@ Yeni DB şeması nullable alanla oluşturulur. Eski SQL Server şemasında otoma
 
 ## Doğrulama sınırı
 
-Güncel `source-contract-v11` sürümünde 186 Python testi ve 17 JavaScript arayüz mantığı testi başarılı. API/depolama testleri gerçek SQLite ve gömülü Qdrant kullanır; model gereken senaryolarda deterministik test çifti vardır. Kullanıcının yüklediği gerçek bitki PDF'si de gerçek metin çıkarma, parçalama, SQLite ve gömülü Qdrant yolundan geçirilmiştir: bildirilen çok ölçütlü iklim sorusu dört gerekli kanıt hücresinin tamamını bularak yapılandırılmış cevap üretmiştir. Arayüz testleri DOM test çiftidir; gerçek görsel tarayıcı testi değildir. Güncel Windows sonucu uygulama çekilip başlatıldıktan sonra ayrıca görülecektir.
+Güncel `source-contract-v12` sürümünde 189 Python testi ve 17 JavaScript arayüz mantığı testi başarılı. API/depolama testleri gerçek SQLite ve gömülü Qdrant kullanır; model gereken senaryolarda deterministik test çifti vardır. Kullanıcının yüklediği gerçek bitki PDF'si, ayrı doğru yağış satırları ve bildirilen bozuk matris aynı gerçek metin çıkarma, parçalama, SQLite ve gömülü Qdrant yolundan geçirilmiştir. Bildirilen çok ölçütlü iklim sorusu dört gerekli kanıt hücresini doğru iki kaynaktan bulmuş; sütunları kaymış tabloyu ve PDF içindeki ilgisiz toprak/yeraltı suyu yağış ifadelerini kullanmamıştır. Arayüz testleri DOM test çiftidir; gerçek görsel tarayıcı testi değildir. Güncel Windows sonucu uygulama çekilip başlatıldıktan sonra ayrıca görülecektir.
 
 Uygulamada değişiklik yaptıktan sonra gün sonu paylaşımı için [geliştirme rehberi](DEVELOPMENT.md) kullanılır.
 
