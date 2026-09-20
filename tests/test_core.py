@@ -266,6 +266,26 @@ class CoreTests(unittest.TestCase):
             1,
         )
 
+    def test_rainfall_summary_drops_clipped_cells_and_exam_notes(self):
+        karadeniz = (
+            "Karadeniz iklimi yağış rejimi: ’de azdır. Tuzak / not: "
+            "‘Yaz yağışlı’ ile ‘yaz kuraklığı yok’ aynı şey değildir; "
+            "Karadeniz yıl boyu yağışlıdır."
+        )
+        akdeniz = (
+            "Akdeniz iklimi yağış rejimi: kış yağışlı; yaz kurak, "
+            "zeytin, rejim düzensiz."
+        )
+
+        self.assertEqual(
+            _seasonal_climate_phrase(karadeniz, "karadeniz", "precipitation"),
+            "yıl boyu yağışlıdır",
+        )
+        self.assertEqual(
+            _seasonal_climate_phrase(akdeniz, "akdeniz", "precipitation"),
+            "kış yağışlı; yaz kurak; rejim düzensizdir",
+        )
+
     def test_vegetation_table_row_is_kept_as_one_evidence_relation(self):
         text = """11. TÜRKİYE'NİN BİTKİ VARLIĞI
 11.1. Flora bölgeleri

@@ -16,7 +16,7 @@ from .ranking import bm25, reciprocal_rank_fusion
 from .security import search_subject_ids
 
 
-RAG_REVISION = "2026-09-20-source-contract-v13"
+RAG_REVISION = "2026-09-20-source-contract-v14"
 
 
 NO_EVIDENCE = (
@@ -750,6 +750,7 @@ def _precipitation_relation_quality(text):
         r"\b(?:"
         r"yagis\s+rejim\w*(?:\s+\w+){0,4}\s+(?:duzenli\w*|duzensiz\w*|dagil\w*)|"
         r"yagis\w*(?:\s+\w+){0,4}\s+(?:duzenli\w*|duzensiz\w*)|"
+        r"rejim\w*(?:\s+\w+){0,2}\s+(?:duzenli\w*|duzensiz\w*)|"
         r"yil\s+boyu\w*(?:\s+\w+){0,2}\s+yagis\w*|"
         r"yagis\w*(?:\s+\w+){0,2}\s+yil\s+boyu\w*|"
         r"her\s+mevsim\w*(?:\s+\w+){0,2}\s+yagis\w*"
@@ -1488,6 +1489,46 @@ def _clean_summary_phrase(value):
     return re.sub(r"\s+", " ", str(value or "")).strip(" \t\r\n.,;:–—-")
 
 
+def _precipitation_clause(value):
+    """Bir yağış hücresini sonraki not veya tablo sütununa taşırmaz."""
+    value = re.split(
+        r"[.,;]|\b(?:tuzak|not|uyari|örnek|ornek)\s*[:/]",
+        str(value or ""),
+        maxsplit=1,
+        flags=re.IGNORECASE | re.UNICODE,
+    )[0]
+    value = _clean_summary_phrase(value)
+    if not value or re.match(r"^[’']?(?:de|da|den|dan)\b", value, re.IGNORECASE):
+        return ""
+    return value
+
+
+def _precipitation_distribution_phrase(row):
+    """Uzun ders notundan yalnızca açık yağış dağılımı önermesini çıkarır."""
+    patterns = (
+        r"\by[ıi]l\s+boyunca\s+(?:düzenli\s+)?yağ[ıi]şl[ıi](?:d[ıi]r)?\b",
+        r"\by[ıi]l\s+boyu\s+(?:düzenli\s+)?yağ[ıi]şl[ıi](?:d[ıi]r)?\b",
+        r"\bher\s+mevsim\s+yağ[ıi]şl[ıi](?:d[ıi]r)?\b",
+        r"\byağ[ıi]ş(?:lar)?\s+y[ıi]l\s+boyunca\s+(?:düzenli\s+)?(?:düşer|görülür|dağ[ıi]l[ıi]r)\b",
+        r"\byağ[ıi]ş(?:lar)?(?:\s+rejim\w*)?\s+(?:y[ıi]l\s+boyunca\s+)?(?:düzenli|düzensiz)(?:d[ıi]r)?\b",
+        r"\brejim\w*\s+(?:düzenli|düzensiz)(?:d[ıi]r)?\b",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, row, flags=re.IGNORECASE | re.UNICODE)
+        if match:
+            phrase = _clean_summary_phrase(match.group())
+            phrase = re.sub(
+                r"^(?:(?:yağ[ıi]ş)(?:lar)?(?:\s+rejim\w*)?|rejim\w*)\s+",
+                "",
+                phrase,
+                flags=re.IGNORECASE | re.UNICODE,
+            )
+            if re.fullmatch(r"(?:düzenli|düzensiz)", phrase, re.IGNORECASE):
+                phrase += "dir"
+            return phrase[:1].lower() + phrase[1:]
+    return ""
+
+
 def _seasonal_climate_phrase(row, subject, aspect):
     """Kaynak satırındaki iklim değerlerini yorum katmadan düzenler."""
     row = _strip_citations(row)
@@ -1516,15 +1557,27 @@ def _seasonal_climate_phrase(row, subject, aspect):
         parts = []
         for index, (_, end, label) in enumerate(found):
             limit = found[index + 1][0] if index + 1 < len(found) else len(row)
-            value = _clean_summary_phrase(row[end:limit])
+            value = _precipitation_clause(row[end:limit])
             if value:
                 value = value[:1].lower() + value[1:]
                 separator = ": " if "dönemi" in label else " "
                 parts.append(f"{label}{separator}{value}")
         found_labels = {label for _, _, label in found}
         if {"yaz", "kış"}.issubset(found_labels) and parts:
+            distribution = _precipitation_distribution_phrase(row)
+            if distribution and not any(
+                _normalize_text(distribution) in _normalize_text(part)
+                for part in parts
+            ):
+                if re.match(r"^(?:düzenli|düzensiz)", distribution, re.IGNORECASE):
+                    distribution = "rejim " + distribution
+                parts.append(distribution)
             phrase = "; ".join(parts)
             return phrase if len(phrase.split()) <= 36 else ""
+
+        distribution = _precipitation_distribution_phrase(row)
+        if distribution:
+            return distribution
 
     words = list(re.finditer(r"[^\W\d_]+", row, flags=re.UNICODE))
     start = None
@@ -1540,6 +1593,9 @@ def _seasonal_climate_phrase(row, subject, aspect):
 
     phrase = _clean_summary_phrase(row[start:] if start is not None else row)
     if aspect == "precipitation":
+        distribution = _precipitation_distribution_phrase(row)
+        if distribution:
+            return distribution
         phrase = re.sub(
             r"^(?:yağ[ıi]ş|yagis)(?:lar)?(?:\s+rejim\w*)?\s+",
             "",

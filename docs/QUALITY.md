@@ -86,3 +86,9 @@ Son kullanıcı kabulünde Karadeniz için yalnızca “yaz sıcak ve kurak / k�
 `source-contract-v13`, iki iklimli yağış + bitki örtüsü sorusunda her yağış ilişkisi için tamlık koşulu uygular. Açık “yağış yıl boyunca düzenlidir / yağış rejimi düzensizdir” ilişkisi veya aynı konu satırında yaz, kış ve en fazla/az yağış dönemi birlikte yoksa parça zorunlu kanıt hücresini doldurmaz. Birden fazla aday varsa kaynak sırası yerine en ayrıntılı geçerli ilişki seçilir. Tam dört hücre bulunamazsa cevap modeli çağrılmadan güvenli biçimde reddedilir.
 
 Regresyonlar bildirilen iki yanlış cümleyi önce verip doğru satırları sona koyma ve doğru satırları tamamen kaldırma senaryolarını kapsar. Son doğrulamada 191 Python testi ve 17 JavaScript arayüz mantığı testi başarılıdır.
+
+### Parçalı cevap hücresi — 2026-09-20
+
+`source-contract-v14`, kanıt ilişkisi doğru olsa bile kullanıcıya gösterilecek yağış özetini ayrıca cümle bütünlüğü açısından sınırlar. Ek veya kesme işaretiyle başlayan kırpılmış hücreler, `Tuzak / not / uyarı` bölümleri ve virgülden sonra gelen bitki örnekleri yağış cümlesine katılmaz. Mevsim etiketleri ayrı maddelere çevrilir; açık yıl-boyu ve düzenli/düzensiz ilişkileri yalnızca kendi kısa önermeleriyle gösterilir.
+
+Bildirilen `’de azdır ... Tuzak / not ...` Karadeniz metni ile `kış yağışlı; yaz kurak, zeytin, rejim düzensiz` Akdeniz metni birebir regresyon testidir. Son doğrulamada 193 Python testi ve 17 JavaScript arayüz mantığı testi başarılıdır.

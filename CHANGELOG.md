@@ -4,6 +4,12 @@ Yalnızca gerçekten yapılan değişiklikler kaydedilir. Planlanan özellikler 
 
 ## Unreleased
 
+### Parçalı yağış cümlesi temizliği — 2026-09-20
+
+- Yapılandırılmış iklim cevabı, PDF/OCR parçasının ortasından başlayan `’de azdır` benzeri eksik hücreleri ve `Tuzak / not` açıklamalarını artık kullanıcı yanıtına taşımaz.
+- Mevsim değerleri nokta, virgül ve noktalı virgül sınırlarında ayrıştırılır; bitki örneklerinin yağış rejimine karışması engellenir. Açık `yıl boyu yağışlıdır` ve `rejim düzensizdir` ilişkileri kısa, tamamlanmış önermelere dönüştürülür.
+- Kullanıcının bildirdiği bozuk Karadeniz ve Akdeniz çıktısı birebir regresyon olarak eklendi. 193 Python testi ve 17 JavaScript arayüz mantığı testi başarılıdır.
+
 ### Tam yağış rejimi kanıtı — 2026-09-20
 
 - Geniş iklim karşılaştırmasında yalnızca yaz/kış geçen kısa parçalar artık tam yağış rejimi sayılmaz. Kaynakta ya açık düzenli/düzensiz-yıl boyu ilişkisi ya da yaz, kış ve en fazla/az yağış dönemi birlikte bulunmalıdır.

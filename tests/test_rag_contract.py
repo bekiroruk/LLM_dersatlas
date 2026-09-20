@@ -302,6 +302,37 @@ class RagContractTests(unittest.TestCase):
             {"rainfall", "plants"},
         )
 
+    def test_reported_clipped_rainfall_text_is_rendered_as_clean_claims(self):
+        question = (
+            "Karadeniz ve Akdeniz iklimlerini yağış rejimleri ve doğal "
+            "bitki örtüleri bakımından karşılaştır."
+        )
+        rainfall = source(
+            "rainfall",
+            "Karadeniz iklimi yağış rejimi: ’de azdır. Tuzak / not: "
+            "‘Yaz yağışlı’ ile ‘yaz kuraklığı yok’ aynı şey değildir; "
+            "Karadeniz yıl boyu yağışlıdır.\n"
+            "Akdeniz iklimi yağış rejimi: kış yağışlı; yaz kurak, "
+            "zeytin, rejim düzensiz.",
+        )
+
+        result, model = self.run_question(
+            question,
+            sources=[source("plants", TABLE), rainfall],
+        )
+
+        self.assertEqual(result["outcome"], "answered")
+        self.assertEqual(result["answer_method"], "structured_evidence")
+        self.assertIn("yağış rejimi: yıl boyu yağışlıdır", result["answer"])
+        self.assertIn(
+            "yağış rejimi: kış yağışlı; yaz kurak; rejim düzensizdir",
+            result["answer"],
+        )
+        self.assertNotIn("’de azdır", result["answer"])
+        self.assertNotIn("Tuzak", result["answer"])
+        self.assertNotIn("zeytin", result["answer"])
+        self.assertEqual(model.calls, [])
+
     def test_reported_table_rows_become_a_clean_sourced_comparison(self):
         question = (
             "Karadeniz ve Akdeniz iklimlerini yağış rejimleri ve doğal "

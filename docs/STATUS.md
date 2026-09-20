@@ -39,11 +39,11 @@ Açık gönderme düzeltmesiyle toplam 122 Python ve 15 DOM mantık testi yerel 
 
 Karşılaştırma kaynak kalitesi düzeltmesiyle toplam 125 Python ve 15 DOM mantık testi yerel Linux'ta başarılı. Gerçekçi katalog metni cevap olarak reddedildi; iki iklime ait açık kanıt parçalarının önceliği doğrulandı. Bu otomatik sonuç gerçek model doğruluk garantisi değildir.
 
-`source-contract-v13` son doğrulamasında 191 Python ve 17 DOM mantık testi başarılı. Kullanıcının yüklediği gerçek bitki PDF'si, ayrı doğru yağış satırları ve bildirilen yanıltıcı/eksik iklim parçaları gerçek metin çıkarma, SQLite ve gömülü Qdrant üzerinden birlikte işlendi. Sistem bozuk matris ile aynı PDF'deki ilgisiz toprak/yeraltı suyu ifadelerini ve tam rejim göstermeyen iklim parçalarını dışarıda bıraktı; dört gerekli kanıtı doğru kaynaklardan seçip yapılandırılmış cevap üretti.
+`source-contract-v14` son doğrulamasında 193 Python ve 17 DOM mantık testi başarılı. Kullanıcının yüklediği gerçek bitki PDF'si, ayrı doğru yağış satırları ve bildirilen yanıltıcı/eksik iklim parçaları gerçek metin çıkarma, SQLite ve gömülü Qdrant üzerinden birlikte işlendi. Sistem bozuk matris ile aynı PDF'deki ilgisiz toprak/yeraltı suyu ifadelerini ve tam rejim göstermeyen iklim parçalarını dışarıda bıraktı; ayrıca kırpılmış hücreleri, sınav notlarını ve yağış cümlesine karışan bitki örneklerini temizleyerek dört gerekli kanıttan yapılandırılmış cevap üretti.
 
 ## Bilinen sınırlamalar
 
-- Windows'taki güncel `source-contract-v13` çalıştırması son kullanıcı kabulüyle doğrulanmalı. Hafıza sayfa yenilenince silinir; kalıcı sohbet geçmişi yoktur.
+- Windows'taki güncel `source-contract-v14` çalıştırması son kullanıcı kabulüyle doğrulanmalı. Hafıza sayfa yenilenince silinir; kalıcı sohbet geçmişi yoktur.
 - Genel aramada toplam 30.000 parça koruma sınırı var; aşılırsa ders filtresi kullanılmalı.
 - Eski SQL Server şeması için nullable alan geçişi DBA tarafından ayrıca yapılmalı; bu ortamda SQL Server testi çalıştırılmadı.
 - Islahat Fermanı'nın tarihi gibi sorularda doğru bilgiyi içeren yeni belgenin bulunması ve yeterli cevabın üretilmesi ayrıca doğrulanmalı.
@@ -52,4 +52,4 @@ Karşılaştırma kaynak kalitesi düzeltmesiyle toplam 125 Python ve 15 DOM man
 
 ## Sıradaki adım
 
-Windows kurulumunda güncel kodu çekip `.\scripts\start.ps1` ile `source-contract-v13` sürümünü açmak ve bildirilen iklim sorusunu bir kez çalıştırmak. Yeni proje ZIP'i, doküman yükleme veya yeniden indeksleme gerekli değil.
+Windows kurulumunda güncel kodu çekip `.\scripts\start.ps1` ile `source-contract-v14` sürümünü açmak ve bildirilen iklim sorusunu bir kez çalıştırmak. Yeni proje ZIP'i, doküman yükleme veya yeniden indeksleme gerekli değil.
