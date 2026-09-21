@@ -55,7 +55,7 @@ const context = vm.createContext({
     if (url === '/api/me') data = user;
     else if (url === '/api/subjects') data = availableSubjects;
     else if (url.endsWith('/documents')) data = [];
-    else if (url === '/api/system') data = { model: { reachable: true, chat_ready: true, embed_ready: true }, qdrant_ready: true, max_upload_mb: 20, worker_enabled: true, rag_revision: '2026-09-20-source-contract-v14', database: 'SQLite', version: '0.1.0', chat_model: 'qwen3:4b', embedding_model: 'bge-m3', vector_mode: 'Qdrant gömülü' };
+    else if (url === '/api/system') data = { model: { reachable: true, chat_ready: true, embed_ready: true }, qdrant_ready: true, max_upload_mb: 20, worker_enabled: true, rag_revision: '2026-09-21-source-contract-v15', database: 'SQLite', version: '0.1.0', chat_model: 'qwen3:4b', embedding_model: 'bge-m3', vector_mode: 'Qdrant gömülü' };
     else if (url === '/api/dashboard') data = { ready: 3, chunks: 3, query_count: 0, insufficient: 0, p50_ms: null, p95_ms: null, positive_feedback: 0, errors: 0 };
     else if (url === '/api/questions') {
       const body = JSON.parse(options.body); requests.push(body);
@@ -80,8 +80,8 @@ function check(description, test) { test(); passed++; console.log('OK: ' + descr
 async function main() {
   await new Promise(setImmediate); // Başlangıçtaki sahte API mikro-görevlerini tamamla.
   check('Çalışan RAG sürümü ana ekranda görünür', () => {
-    assert.ok(get('model-badge').textContent.includes('RAG v14'));
-    assert.ok(get('model-badge').title.includes('source-contract-v14'));
+    assert.ok(get('model-badge').textContent.includes('RAG v15'));
+    assert.ok(get('model-badge').title.includes('source-contract-v15'));
   });
   check('Varsayılan Genel Sohbet, tüm dersler ve boş doküman seçimi gönderimi engellemez', () => {
     assert.equal(get('page-title').textContent, 'Genel Sohbet');

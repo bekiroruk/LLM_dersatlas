@@ -7,6 +7,10 @@ class EvaluationToolTests(unittest.TestCase):
     def test_snippet_coverage_is_case_insensitive_and_has_clear_denominator(self):
         self.assertEqual(snippet_coverage("29 MAYIS 1453 Fatih", ["29 Mayıs 1453", "Fatih"]), 1)
         self.assertEqual(snippet_coverage("Yalnızca Fatih", ["1453", "Fatih"]), 0.5)
+        self.assertEqual(
+            snippet_coverage("Yasama yetkisi TBMM'ye aittir.", [["Türkiye Büyük Millet Meclisi", "TBMM"]]),
+            1,
+        )
         self.assertIsNone(snippet_coverage("metin", []))
 
     def test_percentile_uses_linear_interpolation(self):

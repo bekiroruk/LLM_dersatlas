@@ -23,6 +23,7 @@ Ders materyalleri, yerel ortam ayarları, veritabanı ve vektör indeksleri akta
 - Çok ölçütlü iklim karşılaştırması için konu × ölçüt kanıt kapsaması eklendi. Benzerlik kısa listesi eksik olsa bile bütün yetkili hazır parçalardan gereken açık kanıtlar seçilir.
 - Veri yolları proje köküne sabitlendi ve Windows başlatıcısı çalışan kodun RAG sürümünü doğrular; yanlış çalışma klasörü veya eski Uvicorn süreci nedeniyle başka veri alanının açılması engellenir.
 - Genel ajan kabul aracı Tarih, Coğrafya, Vatandaşlık ve kaynak-dışı soruları ders seçmeden çalıştıracak şekilde hazırlandı; kaynak/cevap kapsaması, çekimserlik ve gecikme ayrı raporlanır.
+- İlk gerçek sekiz soruluk ajan raporu Windows/Ollama üzerinde tamamlandı: cevaplanabilirlik doğruluğu 1,0; kaynak kapsaması 0,833; cevap kapsaması 0,75; p50 23,1 sn ve p95 41,5 sn. İnsan incelemesinde T01'de bozuk hükümdar adı, V01'de cevap anahtarsız soru kataloğu bulundu; ikisi `source-contract-v15` regresyonlarıyla kapatıldı.
 
 ## Doğrulama
 
@@ -42,7 +43,9 @@ Karşılaştırma kaynak kalitesi düzeltmesiyle toplam 125 Python ve 15 DOM man
 
 `source-contract-v14` son doğrulamasında 193 Python ve 17 DOM mantık testi başarılı. Kullanıcının yüklediği gerçek bitki PDF'si, ayrı doğru yağış satırları ve bildirilen yanıltıcı/eksik iklim parçaları gerçek metin çıkarma, SQLite ve gömülü Qdrant üzerinden birlikte işlendi. Sistem bozuk matris ile aynı PDF'deki ilgisiz toprak/yeraltı suyu ifadelerini ve tam rejim göstermeyen iklim parçalarını dışarıda bıraktı; ayrıca kırpılmış hücreleri, sınav notlarını ve yağış cümlesine karışan bitki örneklerini temizleyerek dört gerekli kanıttan yapılandırılmış cevap üretti.
 
-Genel ajan kabul aracı eklendikten sonra 197 Python ve 17 DOM mantık testi başarılı. Kullanıcının Windows kabulünde `source-contract-v14` iklim karşılaştırması doğru ve temiz kaynaklı cevap verdi. Gerçek sekiz soruluk ajan raporu henüz kullanıcının yerel Ollama ve notları üzerinde çalıştırılmadı.
+Genel ajan kabul aracı eklendikten sonra 197 Python ve 17 DOM mantık testi başarılı. Kullanıcının Windows kabulünde `source-contract-v14` iklim karşılaştırması doğru ve temiz kaynaklı cevap verdi. Ardından gerçek sekiz soruluk ajan raporu yerel Ollama ve notlarla çalıştırıldı; aşağıdaki v15 düzeltmelerine girdi sağladı.
+
+`source-contract-v15` doğrulamasında 201 Python ve 17 DOM mantık testi başarılı. İlk gerçek sekiz soruluk ajan raporundaki T01 ve V01 kusurları birebir regresyona dönüştürüldü. Soru katalogları kanıt sayılmaz; bozuk `I. Fatih Sultan` kalıbı reddedilir ve aynı kanıt kapsamındaki tam hükümdar adı tercih edilir. Düzeltme sonrası gerçek Windows/Ollama raporu yeniden çalıştırılmalıdır.
 
 ## Bilinen sınırlamalar
 
@@ -55,4 +58,4 @@ Genel ajan kabul aracı eklendikten sonra 197 Python ve 17 DOM mantık testi ba�
 
 ## Sıradaki adım
 
-Windows kurulumunda güncel kodu çekip `source-contract-v14` üzerinde sekiz soruluk genel ajan kabul raporunu çalıştırmak. Yeni proje ZIP'i, doküman yükleme veya yeniden indeksleme gerekli değil.
+Windows kurulumunda güncel kodu çekip `source-contract-v15` üzerinde sekiz soruluk genel ajan kabul raporunu yeni çıktı adıyla yeniden çalıştırmak. Yeni proje ZIP'i, doküman yükleme veya yeniden indeksleme gerekli değil.

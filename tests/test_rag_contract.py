@@ -461,6 +461,46 @@ class RagContractTests(unittest.TestCase):
         self.assertNotIn("I. Fatih", result["answer"])
         self.assertEqual(model.calls, [])
 
+    def test_conquest_prefers_complete_ruler_over_malformed_ordinal_title(self):
+        malformed = source(
+            "malformed-conquest",
+            "İstanbul'un Fethi\nTarih: 29 Mayıs 1453\n"
+            "Padişah: I. Fatih Sultan",
+        )
+        complete = source(
+            "complete-conquest",
+            "İstanbul'un Fethi\nTarih: 29 Mayıs 1453\n"
+            "Padişah: Fatih Sultan Mehmet",
+        )
+        result, model = self.run_question(
+            "İstanbul hangi tarihte ve hangi padişah döneminde fethedildi?",
+            sources=[malformed, complete],
+        )
+        self.assertIn("Fatih Sultan Mehmet döneminde", result["answer"])
+        self.assertNotIn("I. Fatih", result["answer"])
+        self.assertEqual(model.calls, [])
+
+    def test_question_bank_list_cannot_be_returned_as_an_answer(self):
+        questions = source(
+            "question-bank",
+            "Konfederasyonda üye devletler kişiliklerini korur mu? "
+            "Türkiye’de yasama yetkisi hangi organa aittir? "
+            "Türkiye’de yürütme yetkisi ve görevi kime aittir? "
+            "Yargı yetkisi kimlerce kullanılır?",
+        )
+        copied = payload(
+            "Türkiye’de yasama yetkisi hangi organa aittir? "
+            "Türkiye’de yürütme yetkisi ve görevi kime aittir? [K1]",
+            ["K1"],
+        )
+        result, _ = self.run_question(
+            "1982 Anayasası'na göre yasama yetkisi kime aittir?",
+            sources=[questions],
+            responses=[copied],
+        )
+        self.assertNotEqual(result["outcome"], "answered")
+        self.assertNotIn("hangi organa aittir?", result["answer"])
+
     def test_model_cannot_add_an_unsupported_roman_ordinal_to_a_name(self):
         self.assertFalse(_roman_name_claims_supported(
             "İstanbul I. Fatih Sultan döneminde fethedildi.",

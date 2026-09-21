@@ -108,3 +108,9 @@ Sunucu ve Ollama açıkken bütün erişilebilir derslerde ajan değerlendirmesi
 Parola komut satırında görünmeden sorulur. `--subject-id` verilmediği için Tarih, Coğrafya ve Vatandaşlık birlikte aranır. Aynı çıktı yolu ikinci kez kullanılmaz; yeni koşu için yeni dosya adı seçilir.
 
 Rapor; kaynaklardaki beklenen kısa metin kapsamını, üretilen cevaptaki kısa metin kapsamını, cevaplanabilir/cevaplanamaz sonuç eşleşmesini ve p50/p95 sürelerini ayrı verir. Bunlar insan doğruluk incelemesinin yerine geçmez. Başlangıç kümesi iki Tarih, iki Coğrafya, iki Vatandaşlık ve iki kaynak-dışı soru içerir.
+
+### İlk gerçek rapor bulguları — 2026-09-21
+
+Windows'ta yerel Qwen ve yüklenmiş notlarla yapılan ilk sekiz soruluk ajan koşusunda cevaplanabilirlik sınıflaması 8/8 doğruydu; ancak T01 cevabı beklenen tam hükümdar adının yalnızca yarısını doğru karşıladı, V01 ise kaynakta bulunan peş peşe soru maddelerini cevap diye kopyaladı. Bu iki örnek, yalnızca toplam kapsama oranına bakmanın yetmediğini ve başarısız satırların insan tarafından incelenmesi gerektiğini gösterdi.
+
+`source-contract-v15` cevap anahtarı bulunmayan soru kataloglarını arama kanıtından, alıntı yolundan ve geçerli model cevabından çıkarır. Fetih cevabında `I. Fatih Sultan` gibi bozuk sıra sayısı + unvan birleşimleri reddedilir; aynı olay bloğundaki tam hükümdar adı tercih edilir. Kabul ölçümü `TBMM` ve `Türkiye Büyük Millet Meclisi` gibi eşdeğer doğru ifadeleri alternatif olarak değerlendirebilir. Bu davranışlar API, kaynak sözleşmesi, çekirdek ve değerlendirme aracı testleriyle korunur.

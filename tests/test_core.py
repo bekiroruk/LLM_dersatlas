@@ -17,12 +17,26 @@ from app.rag import (
     _evidence_coverage_keys,
     _seasonal_climate_phrase,
     _precipitation_relation_quality,
+    _is_question_catalog,
 )
 from pypdf import PdfWriter
 from docx import Document as WordDocument
 
 
 class CoreTests(unittest.TestCase):
+    def test_question_catalog_is_not_declarative_evidence(self):
+        catalog = (
+            "Türkiye’de yasama yetkisi hangi organa aittir? "
+            "Türkiye’de yürütme yetkisi ve görevi kime aittir? "
+            "Yargı yetkisi kimlerce kullanılır?"
+        )
+        answered = (
+            "Soru: Yasama yetkisi kime aittir? "
+            "Cevap: Yasama yetkisi TBMM'ye aittir."
+        )
+        self.assertTrue(_is_question_catalog(catalog))
+        self.assertFalse(_is_question_catalog(answered))
+
     def test_runtime_data_paths_do_not_depend_on_terminal_directory(self):
         previous = Path.cwd()
         with tempfile.TemporaryDirectory() as directory:

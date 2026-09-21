@@ -25,14 +25,18 @@ def percentile(values, percent):
 
 
 def snippet_coverage(text, snippets):
-    """Beklenen kısa doğrulama parçalarının metinde bulunma oranı."""
+    """Her doğrulama grubunda tek metin veya alternatiflerden birini arar."""
     if not snippets:
         return None
     def fold(value):
         return str(value or "").translate(str.maketrans({"I": "ı", "İ": "i"})).casefold()
 
     candidate = fold(text)
-    return sum(fold(item) in candidate for item in snippets) / len(snippets)
+    groups = [item if isinstance(item, list) else [item] for item in snippets]
+    return sum(
+        any(fold(alternative) in candidate for alternative in group)
+        for group in groups
+    ) / len(groups)
 
 
 def validate_dataset(items):
@@ -53,10 +57,19 @@ def validate_dataset(items):
         if not isinstance(item.get("answerable"), bool):
             raise ValueError(f"{identifier}: answerable true/false olmalı.")
         snippets = item.get("expected_snippets", [])
-        if not isinstance(snippets, list) or not all(
-            isinstance(value, str) and value.strip() for value in snippets
-        ):
-            raise ValueError(f"{identifier}: expected_snippets metin listesi olmalı.")
+        valid_snippets = isinstance(snippets, list) and all(
+            (isinstance(value, str) and value.strip())
+            or (
+                isinstance(value, list)
+                and value
+                and all(isinstance(option, str) and option.strip() for option in value)
+            )
+            for value in snippets
+        )
+        if not valid_snippets:
+            raise ValueError(
+                f"{identifier}: expected_snippets metin veya alternatif metin listeleri içermeli."
+            )
         if item["answerable"] and not snippets:
             raise ValueError(f"{identifier}: cevaplanabilir soru doğrulama parçası taşımalı.")
 

@@ -4,6 +4,13 @@ Yalnızca gerçekten yapılan değişiklikler kaydedilir. Planlanan özellikler 
 
 ## Unreleased
 
+### Soru kataloğu ve hükümdar adı güvenliği — 2026-09-21
+
+- Gerçek sekiz soruluk ajan kabul raporunda Vatandaşlık kaynağındaki peş peşe soru maddelerinin cevap gibi kopyalandığı ve İstanbul'un fethi cevabında `I. Fatih Sultan` biçiminin seçildiği görüldü.
+- Cevap anahtarı taşımayan soru katalogları artık arama adayından ve doğrudan alıntı yolundan çıkarılır; modelin soru listesini yanıt diye döndürmesi ayrıca reddedilir.
+- Fetih bilgisinde aynı kaynak kapsamındaki açık tarih ve hükümdar satırları birlikte değerlendirilir; bozuk sıra sayısı + unvan kalıbı reddedilir ve tam kişi adı tercih edilir.
+- Kabul veri kümesi `TBMM / Türkiye Büyük Millet Meclisi` ile `Mehmet / Mehmed` gibi doğru yazım alternatiflerini tek doğrulama grubu olarak ölçebilir. 201 Python testi, 17 JavaScript arayüz mantığı testi, sözdizimi ve paylaşım kontrolü başarılıdır.
+
 ### Genel ajan kabul ölçümü — 2026-09-20
 
 - `scripts/evaluate.py` artık ders filtresi olmadan tüm erişilebilir notlarda hem `rag` hem `agent` modunu ölçer. Ajan modu gerçek cevap üretimi olmadan çalıştırılamaz.

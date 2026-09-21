@@ -4,7 +4,7 @@
     "course": "Tarih",
     "question": "İstanbul hangi tarihte ve hangi padişah döneminde fethedildi?",
     "answerable": true,
-    "expected_snippets": ["29 Mayıs 1453", "Fatih Sultan Mehmet"]
+    "expected_snippets": ["29 Mayıs 1453", ["Fatih Sultan Mehmet", "Fatih Sultan Mehmed"]]
   },
   {
     "id": "T02",
@@ -32,7 +32,7 @@
     "course": "Vatandaşlık",
     "question": "1982 Anayasası'na göre yasama yetkisi kime aittir?",
     "answerable": true,
-    "expected_snippets": ["Türkiye Büyük Millet Meclisi"]
+    "expected_snippets": [["Türkiye Büyük Millet Meclisi", "TBMM"]]
   },
   {
     "id": "V02",

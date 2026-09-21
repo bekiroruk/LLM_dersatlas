@@ -266,6 +266,24 @@ class APITests(unittest.TestCase):
         self.assertEqual({s["subject_id"] for s in filtered}, {geography})
         self.assertTrue(all(s["subject_name"] == "Coğrafya" for s in filtered))
 
+    def test_question_catalog_is_excluded_when_declarative_source_exists(self):
+        catalog = self.ready_in(
+            self.subject,
+            "Türkiye’de yasama yetkisi hangi organa aittir? "
+            "Türkiye’de yürütme yetkisi ve görevi kime aittir? "
+            "Yargı yetkisi kimlerce kullanılır?",
+        )
+        statement = self.ready_in(
+            self.subject,
+            "1982 Anayasası'na göre yasama yetkisi Türkiye Büyük Millet "
+            "Meclisine aittir.",
+        )
+        sources = self.search_notes(
+            "1982 Anayasasına göre yasama yetkisi kime aittir?"
+        ).json()["sources"]
+        self.assertIn(statement, {source["document_id"] for source in sources})
+        self.assertNotIn(catalog, {source["document_id"] for source in sources})
+
     def test_general_metric_feedback_and_dashboard(self):
         self.ready_document()
         result = self.client.post('/api/questions', json={"question": "Tanzimat ne zaman?"}, headers=self.headers).json()

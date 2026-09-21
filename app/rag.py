@@ -16,7 +16,7 @@ from .ranking import bm25, reciprocal_rank_fusion
 from .security import search_subject_ids
 
 
-RAG_REVISION = "2026-09-20-source-contract-v14"
+RAG_REVISION = "2026-09-21-source-contract-v15"
 
 
 NO_EVIDENCE = (
@@ -361,6 +361,28 @@ def _source_units(text):
             units.append(unit)
 
     return units
+
+
+def _is_question_catalog(text):
+    """Cevap içermeyen, ağırlıklı olarak soru maddelerinden oluşan metin."""
+    if str(text or "").count("?") < 2:
+        return False
+    meaningful = [
+        unit for unit in _source_units(text)
+        if len(_tokens(unit)) >= 3
+    ]
+    if len(meaningful) < 2:
+        return False
+    questions = sum("?" in unit for unit in meaningful)
+    answer_markers = re.search(
+        r"\b(?:cevap|yanit|dogru\s+secenek|cozum)\w*\b|(?:→|=>)",
+        _normalize_text(text),
+    )
+    return bool(
+        not answer_markers
+        and questions >= 2
+        and questions >= math.ceil(len(meaningful) * 0.70)
+    )
 
 
 def _evidence_units(text):
@@ -2011,6 +2033,15 @@ def _event_ruler(text, target):
     return None
 
 
+def _malformed_roman_ruler_name(value):
+    """“I. Fatih Sultan” benzeri sıra sayısı + sıfat + unvan artığı."""
+    return bool(re.search(
+        r"\b[IVXLCDM]+\.\s+[A-ZÇĞİÖŞÜ][^\W\d_]+\s+Sultan\b",
+        str(value or ""),
+        flags=re.UNICODE,
+    ))
+
+
 def _direct_conquest_result(question, sources, trace):
     """Fetih tarihini ve hükümdarını kaynakta açık bloklardan kurar."""
     normalized = _normalize_text(question)
@@ -2034,20 +2065,33 @@ def _direct_conquest_result(question, sources, trace):
     ruler_candidates = []
     for source_index, source in enumerate(sources):
         units = _source_units(source.get("text", ""))
-        for index, unit in enumerate(units):
-            tokens = _tokens(unit)
+        for index, _ in enumerate(units):
+            block = "\n".join(units[index:min(index + 5, len(units))])
+            tokens = _tokens(block)
             if not (
                 all(_term_in_tokens(term, tokens) for term in target_terms)
                 and _term_in_tokens("feth", tokens)
             ):
                 continue
-            block = "\n".join(units[index:min(index + 5, len(units))])
             date = _event_date(block)
             ruler = _event_ruler(block, target)
             if date:
                 date_candidates.append((not date[2], source_index, len(block), date, source))
             if ruler:
-                ruler_candidates.append((-len(_tokens(ruler)), source_index, ruler, source))
+                explicit_role = bool(re.search(
+                    r"(?:^|\n)\s*(?:Osmanlı\s+)?(?:padişahı?|hükümdarı?)\s*"
+                    r"(?::|–|—|-|\s)",
+                    block,
+                    flags=re.IGNORECASE | re.UNICODE | re.MULTILINE,
+                ))
+                ruler_candidates.append((
+                    int(_malformed_roman_ruler_name(ruler)),
+                    -int(explicit_role),
+                    -len(_tokens(ruler)),
+                    source_index,
+                    ruler,
+                    source,
+                ))
 
     if not date_candidates or not ruler_candidates:
         return None
@@ -2058,9 +2102,9 @@ def _direct_conquest_result(question, sources, trace):
         date_candidates,
         key=lambda item: item[:4],
     )
-    ruler_candidates.sort(key=lambda item: item[:3])
+    ruler_candidates.sort(key=lambda item: item[:5])
     best_ruler = ruler_candidates[0]
-    ruler, ruler_source = best_ruler[2], best_ruler[3]
+    ruler, ruler_source = best_ruler[4], best_ruler[5]
     date_word = "tarihinde" if date[2] else "yılında"
     source_ids = []
     for source in (date_source, ruler_source):
@@ -2195,6 +2239,12 @@ def _is_question_echo(
     )
 
     if not plain_answer:
+        return True
+
+    # Bir cevap içinde peş peşe soru cümleleri dönmesi, modelin cevap
+    # anahtarı olmayan soru bankası parçasını yanıt diye kopyaladığını
+    # gösterir. Tek bir retorik soruyu değil, soru kataloğunu engelle.
+    if _is_question_catalog(answer):
         return True
 
     questions = {
@@ -2344,6 +2394,12 @@ def _sensitive_claims_supported(
 
 def _roman_name_claims_supported(answer, source_texts):
     """Modelin kişi adına kaynakta olmayan bir Roma rakamı eklemesini engeller."""
+    # Türkçe hükümdar adlandırmasında sıra sayısı kişisel adla kullanılır
+    # (örn. II. Mehmet). “I. Fatih Sultan” gibi sıra sayısı + sıfat + Sultan
+    # dizilimi kaynakta OCR/model artığı olarak bulunsa bile geçerli kişi adı
+    # sayılmaz.
+    if _malformed_roman_ruler_name(_strip_citations(answer)):
+        return False
     combined = _normalize_text("\n".join(source_texts))
     for match in re.finditer(
         r"\b[IVXLCDM]+\.\s+"
@@ -2497,6 +2553,9 @@ def _extractive_fallback(
         )
 
         for unit_index, unit in enumerate(units):
+            # Cevabı olmayan soru bankası satırı kanıt alıntısı değildir.
+            if "?" in unit:
+                continue
             unit_tokens = _tokens(unit)
 
             if (
@@ -3027,6 +3086,13 @@ class RAGService:
                     6,
                 ),
             }
+
+            # Soru işaretiyle biten maddelerden oluşan cevap anahtarsız
+            # test/katalog parçaları, yüksek sözcük örtüşmesine rağmen bilgi
+            # kanıtı değildir. Bunları bütçeden çıkar ki daha aşağıdaki
+            # açıklayıcı anayasa/ders satırı modele ulaşabilsin.
+            if _is_question_catalog(chunk.text):
+                continue
 
             match_count = _match_count(
                 anchors,
