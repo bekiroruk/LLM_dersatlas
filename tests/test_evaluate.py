@@ -1,7 +1,15 @@
+import argparse
+import io
+from pathlib import Path
+import tempfile
 import unittest
+import urllib.error
 
 from scripts.evaluate import (
     percentile,
+    load_checkpoint,
+    post_json,
+    save_checkpoint,
     snippet_coverage,
     source_requirement_coverage,
     summarize,
@@ -10,6 +18,74 @@ from scripts.evaluate import (
 
 
 class EvaluationToolTests(unittest.TestCase):
+    def test_post_json_retries_transient_503(self):
+        class Client:
+            calls = 0
+
+            def open(self, request, timeout):
+                self.calls += 1
+                if self.calls < 3:
+                    raise urllib.error.HTTPError(
+                        request.full_url, 503, "unavailable", {}, None
+                    )
+                return io.BytesIO(b'{"ok": true}')
+
+        client = Client()
+        waits = []
+        result = post_json(
+            client,
+            "http://127.0.0.1:8000/api/questions",
+            {"question": "Soru"},
+            retries=3,
+            retry_wait=2,
+            sleep=waits.append,
+        )
+        self.assertEqual(result, {"ok": True})
+        self.assertEqual(client.calls, 3)
+        self.assertEqual(waits, [2, 4])
+
+    def test_post_json_does_not_retry_permanent_http_error(self):
+        class Client:
+            def open(self, request, timeout):
+                raise urllib.error.HTTPError(
+                    request.full_url, 400, "bad request", {}, None
+                )
+
+        with self.assertRaises(urllib.error.HTTPError):
+            post_json(
+                Client(),
+                "http://127.0.0.1:8000/api/questions",
+                {},
+                retries=3,
+                retry_wait=0,
+                sleep=lambda _: None,
+            )
+
+    def test_checkpoint_round_trip_and_run_guard(self):
+        args = argparse.Namespace(
+            url="http://127.0.0.1:8000",
+            subject_id=None,
+            mode="agent",
+            with_generation=True,
+        )
+        questions = [
+            {"id": "A", "question": "Birinci?"},
+            {"id": "B", "question": "İkinci?"},
+        ]
+        from scripts.evaluate import _checkpoint_key
+
+        key = _checkpoint_key(args, questions)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "report.json.partial"
+            save_checkpoint(path, key, [{"id": "A", "answer": "Yanıt"}])
+            self.assertEqual(
+                load_checkpoint(path, key, questions),
+                [{"id": "A", "answer": "Yanıt"}],
+            )
+            wrong = {**key, "mode": "rag"}
+            with self.assertRaises(SystemExit):
+                load_checkpoint(path, wrong, questions)
+
     def test_snippet_coverage_is_case_insensitive_and_has_clear_denominator(self):
         self.assertEqual(snippet_coverage("29 MAYIS 1453 Fatih", ["29 Mayıs 1453", "Fatih"]), 1)
         self.assertEqual(snippet_coverage("Yalnızca Fatih", ["1453", "Fatih"]), 0.5)

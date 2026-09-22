@@ -1,6 +1,7 @@
 """Çalışan DersAtlas API'sinde RAG/ajan kabul ölçümü üretir."""
 import argparse
 import getpass
+import hashlib
 import http.cookiejar
 import json
 import math
@@ -8,7 +9,98 @@ import os
 from pathlib import Path
 import statistics
 import time
+import urllib.error
 import urllib.request
+
+
+TRANSIENT_HTTP_CODES = {429, 502, 503, 504}
+
+
+def post_json(client, url, body, retries=3, retry_wait=10, sleep=time.sleep):
+    """Geçici yerel model/API hatalarında sınırlı sayıda yeniden dener."""
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(body).encode(),
+        headers={
+            "Content-Type": "application/json",
+            "X-Requested-With": "DersAtlas",
+        },
+        method="POST",
+    )
+    for attempt in range(retries + 1):
+        try:
+            with client.open(request, timeout=900) as response:
+                return json.load(response)
+        except urllib.error.HTTPError as exc:
+            transient = exc.code in TRANSIENT_HTTP_CODES
+            if not transient or attempt >= retries:
+                raise
+            delay = retry_wait * (2 ** attempt)
+            print(
+                f"HTTP {exc.code}; {delay:g} saniye sonra yeniden deneniyor "
+                f"({attempt + 1}/{retries})..."
+            )
+            sleep(delay)
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
+            if attempt >= retries:
+                raise
+            delay = retry_wait * (2 ** attempt)
+            print(
+                f"Geçici bağlantı hatası; {delay:g} saniye sonra yeniden "
+                f"deneniyor ({attempt + 1}/{retries})..."
+            )
+            sleep(delay)
+
+
+def _checkpoint_key(args, questions):
+    encoded = json.dumps(
+        questions, ensure_ascii=False, sort_keys=True
+    ).encode("utf-8")
+    return {
+        "dataset_sha256": hashlib.sha256(encoded).hexdigest(),
+        "url": args.url.rstrip("/"),
+        "subject_id": args.subject_id,
+        "mode": args.mode,
+        "with_generation": args.with_generation,
+    }
+
+
+def load_checkpoint(path, key, questions):
+    """Aynı koşuya ait doğrulanmış ara sonuçları yükler."""
+    if not path.exists():
+        return []
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"Ara kayıt okunamadı: {path} ({exc})") from exc
+    results = payload.get("results")
+    if payload.get("key") != key or not isinstance(results, list):
+        raise SystemExit(
+            f"Ara kayıt bu koşuyla uyuşmuyor: {path}. Dosyayı sil veya yeni "
+            "bir --output yolu seç."
+        )
+    expected_ids = [
+        str(item.get("id") or f"Q{index:02d}")
+        for index, item in enumerate(questions, start=1)
+    ]
+    actual_ids = [str(row.get("id")) for row in results]
+    if actual_ids != expected_ids[:len(actual_ids)]:
+        raise SystemExit(
+            f"Ara kayıttaki soru sırası geçersiz: {path}. Dosyayı sil veya "
+            "yeni bir --output yolu seç."
+        )
+    return results
+
+
+def save_checkpoint(path, key, results):
+    """Ara sonucu yarım JSON bırakmayacak biçimde atomik kaydeder."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = Path(str(path) + ".tmp")
+    temporary.write_text(
+        json.dumps({"key": key, "results": results}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    temporary.replace(path)
 
 
 def percentile(values, percent):
@@ -199,6 +291,18 @@ def build_parser():
         default=6,
         help="İstekler arasındaki saniye; varsayılan hız sınırlarına uyum sağlar.",
     )
+    parser.add_argument(
+        "--retries",
+        type=int,
+        default=3,
+        help="429/502/503/504 ve bağlantı hatalarında yeniden deneme sayısı.",
+    )
+    parser.add_argument(
+        "--retry-wait",
+        type=float,
+        default=10,
+        help="Yeniden denemeler arasındaki başlangıç bekleme süresi.",
+    )
     return parser
 
 
@@ -206,26 +310,34 @@ def main(argv=None):
     args = build_parser().parse_args(argv)
     if args.mode == "agent" and not args.with_generation:
         raise SystemExit("Ajan değerlendirmesi --with-generation gerektirir.")
+    if args.retries < 0 or args.retry_wait < 0:
+        raise SystemExit("--retries ve --retry-wait negatif olamaz.")
     target = Path(args.output)
     if target.exists():
         raise SystemExit("Çıktı zaten var; yeni bir --output yolu seç.")
 
     questions = json.loads(Path(args.dataset).read_text(encoding="utf-8"))
     validate_dataset(questions)
+    checkpoint = Path(str(target) + ".partial")
+    checkpoint_key = _checkpoint_key(args, questions)
+    results = load_checkpoint(checkpoint, checkpoint_key, questions)
+    if results:
+        print(
+            f"Ara kayıt bulundu: {len(results)}/{len(questions)} soru tamamlanmış; "
+            "kaldığı yerden devam ediliyor."
+        )
     cookie_jar = http.cookiejar.CookieJar()
     client = urllib.request.build_opener(
         urllib.request.HTTPCookieProcessor(cookie_jar)
     )
 
     def post(path, body):
-        request = urllib.request.Request(
+        return post_json(
+            client,
             args.url.rstrip("/") + path,
-            data=json.dumps(body).encode(),
-            headers={
-                "Content-Type": "application/json",
-                "X-Requested-With": "DersAtlas",
-            },
-            method="POST",
+            body,
+            retries=args.retries,
+            retry_wait=args.retry_wait,
         )
         with client.open(request, timeout=900) as response:
             return json.load(response)
@@ -233,8 +345,9 @@ def main(argv=None):
     password = os.environ.get(args.password_env) or getpass.getpass("Parola: ")
     post("/api/login", {"username": args.username, "password": password})
 
-    results = []
-    for index, item in enumerate(questions, start=1):
+    for index, item in enumerate(
+        questions[len(results):], start=len(results) + 1
+    ):
         if results:
             time.sleep(max(0, args.delay))
         started = time.perf_counter()
@@ -242,12 +355,27 @@ def main(argv=None):
         if args.subject_id:
             body["subject_id"] = args.subject_id
 
-        if args.with_generation:
-            response = post("/api/questions", body)
-            sources = response["sources"]
-        else:
-            response = None
-            sources = post("/api/search", body)["sources"]
+        try:
+            if args.with_generation:
+                response = post("/api/questions", body)
+                sources = response["sources"]
+            else:
+                response = None
+                sources = post("/api/search", body)["sources"]
+        except urllib.error.HTTPError as exc:
+            save_checkpoint(checkpoint, checkpoint_key, results)
+            raise SystemExit(
+                f"{item.get('id', index)} tamamlanamadı: HTTP {exc.code}. "
+                f"Tamamlanan {len(results)} soru {checkpoint} dosyasına "
+                "kaydedildi; aynı komutu yeniden çalıştırınca devam eder."
+            ) from None
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
+            save_checkpoint(checkpoint, checkpoint_key, results)
+            raise SystemExit(
+                f"{item.get('id', index)} tamamlanamadı: {exc}. Tamamlanan "
+                f"{len(results)} soru {checkpoint} dosyasına kaydedildi; aynı "
+                "komutu yeniden çalıştırınca devam eder."
+            ) from None
 
         source_text = "\n".join(source.get("text", "") for source in sources)
         snippets = item.get("expected_snippets", [])
@@ -292,6 +420,7 @@ def main(argv=None):
                 "source_count": len(response["sources"]),
             })
         results.append(row)
+        save_checkpoint(checkpoint, checkpoint_key, results)
         print(f"{index}/{len(questions)} {row['id']} tamamlandı")
 
     report = {
@@ -307,6 +436,7 @@ def main(argv=None):
     target.parent.mkdir(parents=True, exist_ok=True)
     with target.open("x", encoding="utf-8") as file:
         json.dump(report, file, ensure_ascii=False, indent=2)
+    checkpoint.unlink(missing_ok=True)
     print(json.dumps(report["summary"], ensure_ascii=False, indent=2))
     print("Rapor:", target)
 
