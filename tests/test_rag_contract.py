@@ -480,6 +480,25 @@ class RagContractTests(unittest.TestCase):
         self.assertNotIn("I. Fatih", result["answer"])
         self.assertEqual(model.calls, [])
 
+    def test_conquest_with_date_but_without_ruler_fails_closed(self):
+        date_only = source(
+            "date-only-conquest",
+            "Yükselme Dönemi son tekrar\nİstanbul 29 Mayıs 1453'te fethedildi.\n"
+            "Feth-i Mübin İstanbul'un fethidir.",
+        )
+        unrelated = source(
+            "unrelated-ruler",
+            "Meclisi açma-kapama yetkisi padişahtadır. Devletin başkenti "
+            "İstanbul'dur.",
+        )
+        result, model = self.run_question(
+            "İstanbul hangi tarihte ve hangi padişah döneminde fethedildi?",
+            sources=[date_only, unrelated],
+        )
+        self.assertEqual(result["outcome"], "insufficient")
+        self.assertNotIn("Meclisi açma", result["answer"])
+        self.assertEqual(model.calls, [])
+
     def test_question_bank_list_cannot_be_returned_as_an_answer(self):
         questions = source(
             "question-bank",

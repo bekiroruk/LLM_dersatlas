@@ -284,6 +284,49 @@ class APITests(unittest.TestCase):
         self.assertIn(statement, {source["document_id"] for source in sources})
         self.assertNotIn(catalog, {source["document_id"] for source in sources})
 
+    def test_conquest_completion_scans_beyond_similarity_shortlist(self):
+        date_document = self.ready_in(
+            self.subject,
+            "İstanbul'un Fethi\nTarih: 29 Mayıs 1453",
+        )
+        ruler_document = self.ready_in(
+            self.subject,
+            "İstanbul'un Fethi\nPadişah: Fatih Sultan Mehmet",
+        )
+        self.ready_in(
+            self.subject,
+            "Meclisi açma-kapama yetkisi padişahtadır. Devletin başkenti "
+            "İstanbul'dur.",
+        )
+        with (
+            patch("app.rag.bm25", return_value=[]),
+            patch.object(self.app.state.vectors, "search", return_value=[]),
+            patch.object(
+                self.model,
+                "chat",
+                side_effect=AssertionError("Açık olay kanıtında model gerekmemeli"),
+            ),
+        ):
+            result = self.client.post(
+                "/api/questions",
+                json={
+                    "question": (
+                        "İstanbul hangi tarihte ve hangi padişah döneminde "
+                        "fethedildi?"
+                    ),
+                    "mode": "rag",
+                },
+                headers=self.headers,
+            ).json()
+
+        self.assertEqual(result["outcome"], "answered")
+        self.assertIn("29 Mayıs 1453", result["answer"])
+        self.assertIn("Fatih Sultan Mehmet", result["answer"])
+        self.assertEqual(
+            {source["document_id"] for source in result["sources"]},
+            {date_document, ruler_document},
+        )
+
     def test_general_metric_feedback_and_dashboard(self):
         self.ready_document()
         result = self.client.post('/api/questions', json={"question": "Tanzimat ne zaman?"}, headers=self.headers).json()

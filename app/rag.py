@@ -16,7 +16,7 @@ from .ranking import bm25, reciprocal_rank_fusion
 from .security import search_subject_ids
 
 
-RAG_REVISION = "2026-09-21-source-contract-v15"
+RAG_REVISION = "2026-09-23-source-contract-v16"
 
 
 NO_EVIDENCE = (
@@ -2042,8 +2042,8 @@ def _malformed_roman_ruler_name(value):
     ))
 
 
-def _direct_conquest_result(question, sources, trace):
-    """Fetih tarihini ve hükümdarını kaynakta açık bloklardan kurar."""
+def _conquest_request(question):
+    """Tarih ve hükümdarı birlikte isteyen açık fetih sorusunu ayrıştırır."""
     normalized = _normalize_text(question)
     if not (
         re.search(r"\bhangi\s+tarih\w*\b", normalized)
@@ -2055,11 +2055,58 @@ def _direct_conquest_result(question, sources, trace):
     target_match = re.match(r"^(.+?)\s+hangi\s+tarih", str(question), flags=re.I)
     if not target_match:
         return None
-    target_display = target_match.group(1).strip(" \t,;:–—-?!.\"“”")
-    target_terms = _content_terms(target_display)
-    if not target_terms:
+    display = target_match.group(1).strip(" \t,;:–—-?!.\"“”")
+    terms = _content_terms(display)
+    if not terms:
         return None
-    target = target_terms[0]
+    return display, terms, terms[0]
+
+
+def _conquest_evidence_keys(question, allowed):
+    """Benzerlik kısa listesinden bağımsız tarih ve hükümdar parçalarını bulur."""
+    request = _conquest_request(question)
+    if request is None:
+        return []
+    _, target_terms, target = request
+
+    date_candidates = []
+    ruler_candidates = []
+    for key, (chunk, _, _) in allowed.items():
+        if _is_question_catalog(chunk.text):
+            continue
+        units = _source_units(chunk.text)
+        for index in range(len(units)):
+            block = "\n".join(units[index:min(index + 5, len(units))])
+            tokens = _tokens(block)
+            if not (
+                all(_term_in_tokens(term, tokens) for term in target_terms)
+                and _term_in_tokens("feth", tokens)
+            ):
+                continue
+            date = _event_date(block)
+            ruler = _event_ruler(block, target)
+            lexical = _match_count(_question_anchors(question), block)
+            if date:
+                date_candidates.append((int(date[2]), lexical, -len(block), str(key)))
+            if ruler and not _malformed_roman_ruler_name(ruler):
+                ruler_candidates.append((len(_tokens(ruler)), lexical, -len(block), str(key)))
+
+    ordered = []
+    for candidates in (date_candidates, ruler_candidates):
+        if not candidates:
+            continue
+        key = max(candidates)[-1]
+        if key not in ordered:
+            ordered.append(key)
+    return ordered
+
+
+def _direct_conquest_result(question, sources, trace):
+    """Fetih tarihini ve hükümdarını kaynakta açık bloklardan kurar."""
+    request = _conquest_request(question)
+    if request is None:
+        return None
+    target_display, target_terms, target = request
 
     date_candidates = []
     ruler_candidates = []
@@ -2921,6 +2968,7 @@ class RAGService:
         # en önüne alınır; ACL, belge durumu ve embedding modeli koşulları
         # yukarıdaki SQL sorgusunda zaten uygulanmıştır.
         coverage_keys, _, _ = _evidence_coverage_keys(question, allowed)
+        event_keys = _conquest_evidence_keys(question, allowed)
 
         search_queries = (
             _retrieval_queries(question)
@@ -3057,6 +3105,10 @@ class RAGService:
             if key not in selected_keys:
                 selected_ranked.append((key, ranked_scores.get(key, 0.0)))
                 selected_keys.add(key)
+        for key in event_keys:
+            if key not in selected_keys:
+                selected_ranked.append((key, ranked_scores.get(key, 0.0)))
+                selected_keys.add(key)
         for lexical in comparison_lexical:
             for key in lexical:
                 if key not in selected_keys:
@@ -3158,6 +3210,13 @@ class RAGService:
                 prioritized.append(candidate_sources[key])
                 seen.add(key)
 
+        # Tarih + hükümdar isteyen fetih sorularında her iki açık olay
+        # parçası genel benzerlik sıralamasından önce cevap bütçesine girer.
+        for key in event_keys:
+            if key in candidate_sources and key not in seen:
+                prioritized.append(candidate_sources[key])
+                seen.add(key)
+
         # Bitki örtüsü tablolarında aynı satırı açıkça taşıyan parçalar,
         # ayrı kategori listelerinden önce gelir.
         if vegetation_queries:
@@ -3196,7 +3255,10 @@ class RAGService:
 
         # TOP_K genel cevap bütçesidir; zorunlu kanıt parçalarını kesemez.
         # Model bağlamı ve API sözleşmesi en fazla 10 kaynağı destekler.
-        result_limit = min(10, max(self.settings.top_k, len(coverage_keys)))
+        result_limit = min(
+            10,
+            max(self.settings.top_k, len(coverage_keys), len(event_keys)),
+        )
         return prioritized[:result_limit]
 
     def _call_structured(
@@ -3586,6 +3648,22 @@ class RAGService:
         )
         if direct is not None:
             return direct
+
+        # Soru iki ayrı olgu istiyor. Bunlardan biri bulunamadığında modelin
+        # tarih satırını uzun bir PDF parçasıyla doldurup cevap saymasına izin
+        # verme; eksik kanıtı açıkça bildir.
+        if _conquest_request(question) is not None:
+            trace.append({
+                "tool": "event_evidence_coverage",
+                "found": 0,
+                "required": 2,
+            })
+            return {
+                "answer": NO_EVIDENCE,
+                "sources": sources,
+                "outcome": "insufficient",
+                "trace": trace,
+            }
 
         structured = _structured_comparison_result(
             question,

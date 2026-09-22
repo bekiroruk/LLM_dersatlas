@@ -181,6 +181,9 @@ class WindowsLauncherTests(unittest.TestCase):
         self.assertIn("/health", start)
         self.assertIn("rag_revision", start)
         self.assertIn("Start-Process", start)
+        self.assertIn("$process.ExitCode", start)
+        self.assertIn("$stdoutLog", start)
+        self.assertIn("$stderrLog", start)
         self.assertIn("Remove-Item $pidFile", stop)
 
 

@@ -24,6 +24,7 @@ Ders materyalleri, yerel ortam ayarları, veritabanı ve vektör indeksleri akta
 - Veri yolları proje köküne sabitlendi ve Windows başlatıcısı çalışan kodun RAG sürümünü doğrular; yanlış çalışma klasörü veya eski Uvicorn süreci nedeniyle başka veri alanının açılması engellenir.
 - Genel ajan kabul aracı Tarih, Coğrafya, Vatandaşlık ve kaynak-dışı soruları ders seçmeden çalıştıracak şekilde hazırlandı; kaynak/cevap kapsaması, çekimserlik ve gecikme ayrı raporlanır.
 - İlk gerçek sekiz soruluk ajan raporu Windows/Ollama üzerinde tamamlandı: cevaplanabilirlik doğruluğu 1,0; kaynak kapsaması 0,833; cevap kapsaması 0,75; p50 23,1 sn ve p95 41,5 sn. İnsan incelemesinde T01'de bozuk hükümdar adı, V01'de cevap anahtarsız soru kataloğu bulundu; ikisi `source-contract-v15` regresyonlarıyla kapatıldı.
+- v15 tekrarında kaynak ve cevap kapsaması 0,917'ye, p95 32,9 saniyeye yükseldi. V01 kapandı; T01 ise hükümdar kanıtı kısa listeden düşünce yalnızca tarih ve dağınık PDF satırlarıyla cevaplandı. `source-contract-v16` iki olay kanıtını tüm yetkili parçalarda tamamlar ve eksikse cevap vermeyi reddeder.
 
 ## Doğrulama
 
@@ -47,6 +48,8 @@ Genel ajan kabul aracı eklendikten sonra 197 Python ve 17 DOM mantık testi ba�
 
 `source-contract-v15` doğrulamasında 201 Python ve 17 DOM mantık testi başarılı. İlk gerçek sekiz soruluk ajan raporundaki T01 ve V01 kusurları birebir regresyona dönüştürüldü. Soru katalogları kanıt sayılmaz; bozuk `I. Fatih Sultan` kalıbı reddedilir ve aynı kanıt kapsamındaki tam hükümdar adı tercih edilir. Düzeltme sonrası gerçek Windows/Ollama raporu yeniden çalıştırılmalıdır.
 
+`source-contract-v16` doğrulamasında 203 Python ve 17 DOM mantık testi başarılı. Fetih tarih ve hükümdar parçalarının genel benzerlik sıralayıcıları boş sonuç verse bile birlikte bulunması, yalnızca tarih varsa güvenli ret verilmesi ve başlatıcının boş günlük yerine çıkış tanısı göstermesi test edildi.
+
 ## Bilinen sınırlamalar
 
 - Hafıza sayfa yenilenince silinir; kalıcı sohbet geçmişi yoktur.
@@ -58,4 +61,4 @@ Genel ajan kabul aracı eklendikten sonra 197 Python ve 17 DOM mantık testi ba�
 
 ## Sıradaki adım
 
-Windows kurulumunda güncel kodu çekip `source-contract-v15` üzerinde sekiz soruluk genel ajan kabul raporunu yeni çıktı adıyla yeniden çalıştırmak. Yeni proje ZIP'i, doküman yükleme veya yeniden indeksleme gerekli değil.
+Windows kurulumunda güncel kodu çekip başlatıcının gerçek kapanma tanısını görmek; ardından `source-contract-v16` üzerinde sekiz soruluk genel ajan kabul raporunu yeni çıktı adıyla çalıştırmak. Yeni proje ZIP'i, doküman yükleme veya yeniden indeksleme gerekli değil.

@@ -9,7 +9,7 @@ $python = (Join-Path $projectRoot ".venv\Scripts\python.exe")
 $healthUrl = "http://127.0.0.1:$Port/health"
 
 if (-not (Test-Path $python -PathType Leaf)) {
-    throw "Python ortamı bulunamadı. Önce .\scripts\setup.ps1 çalıştır."
+    throw "Python ortami bulunamadi. Once .\scripts\setup.ps1 calistir."
 }
 
 Set-Location $projectRoot
@@ -38,12 +38,12 @@ $listeners = @(
 )
 if ($listeners.Count -gt 0) {
     $owners = ($listeners | Select-Object -ExpandProperty OwningProcess -Unique) -join ", "
-    throw "127.0.0.1:$Port başka bir süreç tarafından kullanılıyor (PID: $owners). O süreci kapat veya -Port ile başka port seç."
+    throw "127.0.0.1:$Port baska bir surec tarafindan kullaniliyor (PID: $owners). O sureci kapat veya -Port ile baska port sec."
 }
 
 $revision = (& $python -c "from app.rag import RAG_REVISION; print(RAG_REVISION)").Trim()
 if ($LASTEXITCODE -ne 0 -or -not $revision) {
-    throw "DersAtlas kodu yüklenemedi. Terminal çıktısındaki Python hatasını kontrol et."
+    throw "DersAtlas kodu yuklenemedi. Terminal ciktisindaki Python hatasini kontrol et."
 }
 
 $logDirectory = Join-Path $projectRoot "data\logs"
@@ -75,11 +75,26 @@ $health = $null
 for ($attempt = 0; $attempt -lt 80; $attempt++) {
     Start-Sleep -Milliseconds 500
     if ($process.HasExited) {
-        $details = ""
+        $process.WaitForExit()
+        Start-Sleep -Milliseconds 200
+        $details = @()
         if (Test-Path $stderrLog) {
-            $details = (Get-Content $stderrLog -Tail 25 -ErrorAction SilentlyContinue) -join [Environment]::NewLine
+            $stderrDetails = (Get-Content $stderrLog -Tail 50 -Encoding UTF8 -ErrorAction SilentlyContinue) -join [Environment]::NewLine
+            if ($stderrDetails) {
+                $details += "STDERR:`n$stderrDetails"
+            }
         }
-        throw "DersAtlas başlatılamadı.`n$details"
+        if (Test-Path $stdoutLog) {
+            $stdoutDetails = (Get-Content $stdoutLog -Tail 50 -Encoding UTF8 -ErrorAction SilentlyContinue) -join [Environment]::NewLine
+            if ($stdoutDetails) {
+                $details += "STDOUT:`n$stdoutDetails"
+            }
+        }
+        if ($details.Count -eq 0) {
+            $details += "Sunucu gunluk uretmeden kapandi."
+        }
+        $diagnostic = $details -join [Environment]::NewLine
+        throw "DersAtlas baslatilamadi (cikis kodu: $($process.ExitCode)).`n$diagnostic`nHata gunlugu: $stderrLog`nCikti gunlugu: $stdoutLog"
     }
     try {
         $health = Invoke-RestMethod -Uri $healthUrl -TimeoutSec 2
@@ -94,18 +109,18 @@ for ($attempt = 0; $attempt -lt 80; $attempt++) {
 
 if ($null -eq $health -or $health.status -ne "alive") {
     Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
-    throw "DersAtlas 40 saniye içinde hazır olmadı. Günlük: $stderrLog"
+    throw "DersAtlas 40 saniye icinde hazir olmadi. Gunluk: $stderrLog"
 }
 
 if ([string]$health.rag_revision -ne $revision) {
     Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
-    throw "Yanlış sunucu sürümü açıldı. Beklenen: $revision; çalışan: $($health.rag_revision)"
+    throw "Yanlis sunucu surumu acildi. Beklenen: $revision; calisan: $($health.rag_revision)"
 }
 
-Write-Host "DersAtlas hazır: http://127.0.0.1:$Port" -ForegroundColor Green
-Write-Host "RAG sürümü: $revision"
+Write-Host "DersAtlas hazir: http://127.0.0.1:$Port" -ForegroundColor Green
+Write-Host "RAG surumu: $revision"
 Write-Host "Sunucu PID: $($process.Id)"
-Write-Host "Hata günlüğü: $stderrLog"
+Write-Host "Hata gunlugu: $stderrLog"
 
 if (-not $NoBrowser) {
     Start-Process "http://127.0.0.1:$Port"

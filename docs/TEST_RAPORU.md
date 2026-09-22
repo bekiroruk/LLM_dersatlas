@@ -2,7 +2,7 @@
 
 ## Sonuç
 
-Yerel Linux/Python 3.12 ortamında **201 Python testi** ve **17 JavaScript arayüz mantığı testi** başarılıdır. Python testlerinde atlama başarı sayılmaz. Sözdizimi ve paylaşım kapsamı kontrolleri de geçmiştir.
+Yerel Linux/Python 3.12 ortamında **203 Python testi** ve **17 JavaScript arayüz mantığı testi** başarılıdır. Python testlerinde atlama başarı sayılmaz. Sözdizimi ve paylaşım kapsamı kontrolleri de geçmiştir.
 
 Kullanıcının Windows/Ollama kabulünde `source-contract-v14`, bildirilen Karadeniz–Akdeniz yağış ve bitki örtüsü karşılaştırmasını doğru, temiz ve kaynaklı üretmiştir.
 
@@ -17,6 +17,7 @@ Kullanıcının Windows/Ollama kabulünde `source-contract-v14`, bildirilen Kara
 | Sohbet bağlamı | Başarılı | 4 tur/6000 karakter, takip sorusu, kapsam değişimi, temizleme |
 | İklim karşılaştırması regresyonu | Başarılı | Bozuk PDF tablosu, eksik ilişki, kırpılmış hücre ve sınav notu temizliği |
 | Soru kataloğu ve kişi adı regresyonu | Başarılı | Cevapsız soru listesini kanıt saymama; bozuk hükümdar adını reddetme |
+| Fetih olay kanıtı tamamlama | Başarılı | Tarih ve hükümdarı kısa liste dışında bulma; tek kanıtta güvenli ret |
 | Depolama ve geçiş | Başarılı | SQLite şema geçişi, rollback, yedek hatası ve Qdrant yetki filtresi |
 | Depo güvenliği | Başarılı | İzinli yollar, büyük dosya/secret biçimleri, indeks ve başlatıcı kontrolleri |
 | Arayüz mantığı | 17/17 | Genel kapsam, filtre, ajan, hafıza, gecikmiş yanıt ve kaynak gösterimi |

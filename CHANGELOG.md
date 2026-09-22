@@ -4,6 +4,13 @@ Yalnızca gerçekten yapılan değişiklikler kaydedilir. Planlanan özellikler 
 
 ## Unreleased
 
+### Fetih sorusunda eksik kanıt tamamlama — 2026-09-23
+
+- Gerçek v15 ajan raporunda İstanbul'un fethi için tarih bulunmasına rağmen hükümdar kanıtı kayboldu ve dağınık PDF metni cevap olarak gösterildi. Bu satır doğrudan regresyon örneğine dönüştürüldü.
+- Tarih ve hükümdarı birlikte isteyen fetih sorularında iki açık olay kanıtı, benzerlik kısa listesinden bağımsız olarak bütün yetkili hazır parçalarda aranır ve cevap bütçesine öncelikli alınır.
+- İki kanıttan biri yoksa model veya doğrudan alıntı yolu eksik cevabı tamamlayamaz; sistem kaynak yetersiz sonucuna kapanır.
+- Windows başlatıcısı erken kapanmada çıkış kodunu, stdout/stderr içeriğini ve günlük yollarını birlikte gösterir; kullanıcı mesajları eski PowerShell'in UTF-8 yorumuna bağlı kalmayacak biçimde düzenlendi. 203 Python testi, 17 JavaScript arayüz mantığı testi ve paylaşım kontrolü başarılıdır.
+
 ### Soru kataloğu ve hükümdar adı güvenliği — 2026-09-21
 
 - Gerçek sekiz soruluk ajan kabul raporunda Vatandaşlık kaynağındaki peş peşe soru maddelerinin cevap gibi kopyalandığı ve İstanbul'un fethi cevabında `I. Fatih Sultan` biçiminin seçildiği görüldü.
