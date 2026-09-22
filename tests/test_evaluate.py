@@ -1,6 +1,12 @@
 import unittest
 
-from scripts.evaluate import percentile, snippet_coverage, summarize, validate_dataset
+from scripts.evaluate import (
+    percentile,
+    snippet_coverage,
+    source_requirement_coverage,
+    summarize,
+    validate_dataset,
+)
 
 
 class EvaluationToolTests(unittest.TestCase):
@@ -11,6 +17,31 @@ class EvaluationToolTests(unittest.TestCase):
             snippet_coverage("Yasama yetkisi TBMM'ye aittir.", [["Türkiye Büyük Millet Meclisi", "TBMM"]]),
             1,
         )
+
+    def test_source_requirements_reject_unrelated_fragment_matches(self):
+        sources = [
+            {"text": "İstanbul 29 Mayıs 1453'te fethedildi."},
+            {"text": "Kardeş katlini Fatih Sultan Mehmet kanunlaştırdı."},
+        ]
+        requirements = [
+            {
+                "expected": "29 Mayıs 1453",
+                "all_terms": ["İstanbul", "feth"],
+            },
+            {
+                "expected": ["Fatih Sultan Mehmet", "Fatih Sultan Mehmed"],
+                "all_terms": ["İstanbul", "feth"],
+                "any_terms": ["padişah", "tarafından", "döneminde"],
+            },
+        ]
+        self.assertEqual(source_requirement_coverage(sources, requirements), 0.5)
+        sources.append({
+            "text": (
+                "İstanbul'un fethi Fatih Sultan Mehmet döneminde "
+                "gerçekleşmiştir."
+            )
+        })
+        self.assertEqual(source_requirement_coverage(sources, requirements), 1)
         self.assertIsNone(snippet_coverage("metin", []))
 
     def test_percentile_uses_linear_interpolation(self):

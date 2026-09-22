@@ -39,6 +39,38 @@ def snippet_coverage(text, snippets):
     ) / len(groups)
 
 
+def source_requirement_coverage(sources, requirements):
+    """İlişkili kanıtı aynı kaynak parçası içinde doğrular.
+
+    Birleşik kaynak metninde dağınık geçen doğru sözcükler, tek başına aynı
+    olguyu kanıtlamaz. Her gereksinim en az bir kaynak parçasında bütünüyle
+    karşılanmalıdır.
+    """
+    if not requirements:
+        return None
+
+    def fold(value):
+        return str(value or "").translate(
+            str.maketrans({"I": "ı", "İ": "i"})
+        ).casefold()
+
+    texts = [fold(source.get("text", "")) for source in sources]
+    matched = 0
+    for requirement in requirements:
+        expected = requirement["expected"]
+        alternatives = expected if isinstance(expected, list) else [expected]
+        all_terms = requirement.get("all_terms", [])
+        any_terms = requirement.get("any_terms", [])
+        if any(
+            any(fold(option) in text for option in alternatives)
+            and all(fold(term) in text for term in all_terms)
+            and (not any_terms or any(fold(term) in text for term in any_terms))
+            for text in texts
+        ):
+            matched += 1
+    return matched / len(requirements)
+
+
 def validate_dataset(items):
     """Yanlış raporu engellemek için değerlendirme veri sözleşmesini denetler."""
     if not isinstance(items, list) or not items:
@@ -72,6 +104,33 @@ def validate_dataset(items):
             )
         if item["answerable"] and not snippets:
             raise ValueError(f"{identifier}: cevaplanabilir soru doğrulama parçası taşımalı.")
+        requirements = item.get("source_requirements", [])
+        valid_requirements = isinstance(requirements, list) and all(
+            isinstance(requirement, dict)
+            and (
+                isinstance(requirement.get("expected"), str)
+                and requirement["expected"].strip()
+                or isinstance(requirement.get("expected"), list)
+                and requirement["expected"]
+                and all(
+                    isinstance(option, str) and option.strip()
+                    for option in requirement["expected"]
+                )
+            )
+            and all(
+                isinstance(requirement.get(field, []), list)
+                and all(
+                    isinstance(term, str) and term.strip()
+                    for term in requirement.get(field, [])
+                )
+                for field in ("all_terms", "any_terms")
+            )
+            for requirement in requirements
+        )
+        if not valid_requirements:
+            raise ValueError(
+                f"{identifier}: source_requirements geçerli kanıt kuralları içermeli."
+            )
 
 
 def summarize(results, mode):
@@ -87,6 +146,9 @@ def summarize(results, mode):
         row["answer_span_coverage"] for row in answerable
         if row.get("answer_span_coverage") is not None
     ]
+    corpus_ready = [
+        row for row in generated if row.get("corpus_ready", True)
+    ]
     return {
         "mode": mode,
         "questions": len(results),
@@ -100,6 +162,14 @@ def summarize(results, mode):
         "answerability_accuracy": (
             statistics.mean(row["answerability_match"] for row in generated)
             if generated else None
+        ),
+        "corpus_ready_questions": len(corpus_ready),
+        "corpus_gap_questions": sum(
+            not row.get("corpus_ready", True) for row in generated
+        ),
+        "application_accuracy_on_ready_corpus": (
+            statistics.mean(row["answerability_match"] for row in corpus_ready)
+            if corpus_ready else None
         ),
         "p50_ms": round(percentile(latencies, 50)) if latencies else None,
         "p95_ms": round(percentile(latencies, 95)) if latencies else None,
@@ -181,6 +251,19 @@ def main(argv=None):
 
         source_text = "\n".join(source.get("text", "") for source in sources)
         snippets = item.get("expected_snippets", [])
+        fragment_coverage = snippet_coverage(source_text, snippets)
+        requirement_coverage = source_requirement_coverage(
+            sources, item.get("source_requirements", [])
+        )
+        evidence_coverage = (
+            requirement_coverage
+            if requirement_coverage is not None
+            else fragment_coverage
+        )
+        corpus_ready = (
+            not item["answerable"]
+            or evidence_coverage == 1
+        )
         row = {
             "id": str(item.get("id") or f"Q{index:02d}"),
             "course": item.get("course"),
@@ -191,7 +274,9 @@ def main(argv=None):
                 source.get("subject_name") for source in sources
                 if source.get("subject_name")
             }),
-            "source_span_coverage": snippet_coverage(source_text, snippets),
+            "source_span_coverage": evidence_coverage,
+            "source_fragment_coverage": fragment_coverage,
+            "corpus_ready": corpus_ready,
             "duration_ms": round((time.perf_counter() - started) * 1000),
         }
         if response is not None:

@@ -4,7 +4,18 @@
     "course": "Tarih",
     "question": "İstanbul hangi tarihte ve hangi padişah döneminde fethedildi?",
     "answerable": true,
-    "expected_snippets": ["29 Mayıs 1453", ["Fatih Sultan Mehmet", "Fatih Sultan Mehmed"]]
+    "expected_snippets": ["29 Mayıs 1453", ["Fatih Sultan Mehmet", "Fatih Sultan Mehmed"]],
+    "source_requirements": [
+      {
+        "expected": "29 Mayıs 1453",
+        "all_terms": ["İstanbul", "feth"]
+      },
+      {
+        "expected": ["Fatih Sultan Mehmet", "Fatih Sultan Mehmed"],
+        "all_terms": ["İstanbul", "feth"],
+        "any_terms": ["padişah", "tarafından", "döneminde"]
+      }
+    ]
   },
   {
     "id": "T02",
