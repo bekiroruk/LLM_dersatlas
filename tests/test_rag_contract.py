@@ -243,6 +243,51 @@ class RagContractTests(unittest.TestCase):
         self.assertIn("Tanzimat Fermanı 3 Kasım 1839", context[0]["text"])
         self.assertIn("Islahat Fermanı 1856", context[1]["text"])
 
+    def test_period_range_and_source_heading_cannot_leak_into_comparison_answer(self):
+        question = "Tanzimat ve Islahat fermanlarının farkları nelerdir?"
+        sources = [
+            source(
+                "shared",
+                "Tanzimat Dönemi 1839-1876 arasındadır. "
+                "Tanzimat Fermanı'nda Mustafa Reşit Paşa etkilidir. "
+                "Islahat Fermanı'nda Âli ve Fuat Paşalar etkilidir.",
+            ),
+            source(
+                "tanzimat",
+                "Tanzimat Fermanı 3 Kasım 1839 tarihinde ilan edildi. "
+                "Can, mal ve namus güvenliğini düzenledi.",
+            ),
+            source(
+                "islahat",
+                "Islahat Fermanı 1856 yılında ilan edildi. "
+                "Gayrimüslim tebaanın haklarını genişletti. "
+                "118. CİZYE VERGİSİNİN KALDIRILMASIYLA İLİŞKİ",
+            ),
+        ]
+        invalid = (
+            "Tanzimat Fermanı 1839-1876 yılları arasında ilan edilmiştir. "
+            "İlgili kaynaklarda '118. CİZYE VERGİSİNİN KALDIRILMASIYLA "
+            "İLİŞKİ' gibi detaylar bulunmaktadır. [K1] [K2] [K3]"
+        )
+        result, _ = self.run_question(
+            question,
+            sources=sources,
+            responses=[payload(invalid, ["K1", "K2", "K3"])],
+        )
+
+        self.assertEqual(result["outcome"], "answered")
+        self.assertEqual(
+            result["answer_method"],
+            "comparison_evidence_excerpt",
+        )
+        self.assertNotIn("1839-1876 yılları arasında ilan", result["answer"])
+        self.assertNotIn("İlgili kaynaklarda", result["answer"])
+        self.assertNotIn("gibi detaylar", result["answer"])
+        self.assertTrue(any(
+            item["tool"] == "unsupported_claim_rejected"
+            for item in result["trace"]
+        ))
+
     def test_category_lists_are_not_vegetation_evidence(self):
         for catalog in (
             "İklim: Karadeniz, Akdeniz, karasal. Bitki örtüsü: orman, maki, bozkır, çayır.",

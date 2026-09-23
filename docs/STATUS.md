@@ -28,6 +28,7 @@ Ders materyalleri, yerel ortam ayarları, veritabanı ve vektör indeksleri akta
 - v17 gerçek Windows raporunda hazır kaynaklı sorularda uygulama doğruluğu 1,0 oldu. Tek uyumsuzluk, notlarda hükümdar ilişkisi bulunmayan T01 için güvenli rettir. İlk ölçümde p50 52,1 ve p95 68,2 saniyeydi; uyarlamalı ajan sonrasında aynı kabul akışı p50 8,9 ve p95 15,0 saniyede tamamlandı.
 - Giriş, sohbet, kaynak defteri, doküman ve sistem ekranları modern ve ortak bir tasarım sistemiyle yenilendi. Soru önerileri, canlı karakter sayacı, klavye kısayolu, işlem durumu, kaynak sayısı ve uyarlanabilir mobil yerleşim eklendi; çevrimdışı çalışma korunuyor.
 - Ortak isimli genel karşılaştırmalar (`Tanzimat ve Islahat fermanları` gibi) iki tarafa ayrılarak aranır. Ayrı sayfalardaki kanıtlar dengeli bağlama alınır; model çekimser kalırsa doğrulanmış kaynak satırları gösterilir, tek taraf eksikse sistem cevap uydurmaz.
+- `relation-guard-v20`, dönem aralığını bir fermanın ilan aralığına dönüştüren ilişki hatasını ve PDF bölüm başlığı/meta metnini cevap olarak gösterme kusurunu yayın öncesi reddeder.
 
 ## Doğrulama
 
@@ -68,6 +69,12 @@ ortak özet yerine konuya özel sayfaların seçilmesi, iki sayfadaki destekli
 bilgilerin tek cümlede birleştirilmesi, yerel modelin çekimser kalması durumunda
 kesin kaynak satırlarının gösterilmesi ve tek taraflı kanıtta güvenli ret
 verilmesi test edildi.
+
+`relation-guard-v20` doğrulamasında 222 Python ve 19 DOM mantık testi
+başarılıdır. Kullanıcının gördüğü `Tanzimat Fermanı 1839-1876 yılları arasında
+ilan edilmiştir` ve `ilgili kaynaklarda ... gibi detaylar` çıktısı birebir test
+edildi; dönem–olay ilişkisi ile kaynak başlığı/meta dili artık cevap yayımlanmadan
+reddedilir ve doğrulanmış karşılaştırma satırlarına güvenli dönüş yapılır.
 
 ## Bilinen sınırlamalar
 

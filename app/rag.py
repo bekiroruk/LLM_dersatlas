@@ -17,7 +17,7 @@ from .ranking import bm25, reciprocal_rank_fusion
 from .security import search_subject_ids
 
 
-RAG_REVISION = "2026-09-24-balanced-comparison-v19"
+RAG_REVISION = "2026-09-24-relation-guard-v20"
 
 
 NO_EVIDENCE = (
@@ -2650,6 +2650,92 @@ def _year_claims_supported(
     return True
 
 
+def _range_claims_supported(
+    answer,
+    source_texts,
+):
+    """Bir dönem aralığının olayın ilan aralığına dönüşmesini engeller.
+
+    Örneğin kaynakta yalnızca ``Tanzimat Dönemi 1839-1876`` yazması,
+    ``Tanzimat Fermanı 1839-1876 arasında ilan edildi`` iddiasını
+    desteklemez. Yıl aralığı hem kaynakta bulunmalı hem de cevapta kurulan
+    olay/ilan ilişkisi aynı kaynak biriminde açıkça yer almalıdır.
+    """
+    range_pattern = re.compile(
+        r"\b(1[0-9]{3}|20[0-9]{2})\s*[-–—]\s*"
+        r"(1[0-9]{3}|20[0-9]{2})\b"
+    )
+    source_units = [
+        unit
+        for text in source_texts
+        for unit in _source_units(text)
+    ]
+
+    for answer_unit in _source_units(_strip_citations(answer)):
+        ranges = range_pattern.findall(answer_unit)
+        if not ranges:
+            continue
+
+        answer_tokens = _tokens(answer_unit)
+        claims_edict_announcement = (
+            _term_in_tokens("ferman", answer_tokens)
+            and _term_in_tokens("ilan", answer_tokens)
+        )
+        claim_terms = _content_terms(
+            range_pattern.sub(" ", answer_unit)
+        )
+        required_overlap = 1 if len(claim_terms) <= 1 else 2
+
+        for year_range in ranges:
+            candidates = [
+                unit
+                for unit in source_units
+                if year_range in range_pattern.findall(unit)
+            ]
+            if not candidates:
+                return False
+
+            supported = False
+            for candidate in candidates:
+                candidate_tokens = _tokens(candidate)
+                if claims_edict_announcement and not (
+                    _term_in_tokens("ferman", candidate_tokens)
+                    and _term_in_tokens("ilan", candidate_tokens)
+                ):
+                    continue
+                if _match_count(claim_terms, candidate) >= required_overlap:
+                    supported = True
+                    break
+
+            if not supported:
+                return False
+
+    return True
+
+
+def _contains_source_meta_claim(answer):
+    """Kaynak başlığını veya kaynak hakkında meta yorumu cevap sayma."""
+    plain = _strip_citations(answer)
+    normalized = _normalize_text(plain)
+    return bool(
+        re.search(
+            r"\b(?:ilgili\s+kaynak\w*|kaynak\w*\s+icerisinde|"
+            r"kaynak\w*\s+metninde)\b",
+            normalized,
+        )
+        or re.search(
+            r"\b(?:baslik|madde)\s+numara\w*\b|"
+            r"\bgibi\s+detay\w*\b",
+            normalized,
+        )
+        or re.search(
+            r"(?:^|[\"'“”])\s*\d{2,3}\s*[.]\s*[A-ZÇĞİÖŞÜ]",
+            plain,
+            flags=re.MULTILINE,
+        )
+    )
+
+
 def _sensitive_claims_supported(
     answer,
     source_texts,
@@ -2763,6 +2849,9 @@ def _answer_has_source_support(
     if not _sources_are_relevant(question, selected_sources):
         return False
 
+    if _contains_source_meta_claim(answer):
+        return False
+
     subjects = _vegetation_subjects(question)
     if subjects:
         # Aynı sayfada iki bitki adı geçmesi, bunların iki iklim arasında
@@ -2824,6 +2913,12 @@ def _answer_has_source_support(
         return False
 
     if not _year_claims_supported(
+        answer,
+        source_texts,
+    ):
+        return False
+
+    if not _range_claims_supported(
         answer,
         source_texts,
     ):
@@ -4049,6 +4144,11 @@ class RAGService:
             "göre açıkça düzelt. Kaynakta bir olayla "
             "aynı cümlede veya aynı açık maddede "
             "ilişkilendirilmeyen tarihleri birleştirme. "
+            "Bir dönemin başlangıç-bitiş aralığını o "
+            "dönemdeki bir fermanın ilan tarihi veya ilan "
+            "aralığı gibi yazma; örneğin 'Tanzimat Dönemi "
+            "1839-1876' tek başına Tanzimat Fermanı'nın "
+            "ilan tarihini kanıtlamaz. "
             "Karşılaştırma sorusunda her konu için istenen "
             "özelliği ayrı ayrı bul; kategori listelerini "
             "eşleştirme bilgisi olmadan birbirine bağlama. "
@@ -4061,7 +4161,10 @@ class RAGService:
             "değildir. Yanıtı tekrarsız, doğrudan ve en "
             "fazla dört cümle yaz. Kaynakta açıkça "
             "bulunmayan kurucu, ilk, son, tek, dönem, "
-            "tarih veya kişi ilişkisi ekleme. Her bilgi "
+            "tarih veya kişi ilişkisi ekleme. "
+            "Kaynak başlık numaralarını, bölüm adlarını, "
+            "'ilgili kaynaklarda' veya 'gibi detaylar' "
+            "türü meta ifadeleri cevaba yazma. Her bilgi "
             "cümlesinin sonuna [K1] biçiminde ilgili "
             "kaynak numarasını koy. [K1, K2] değil, "
             "[K1] [K2] biçimini kullan. source_ids "
@@ -4100,6 +4203,9 @@ class RAGService:
             "aynı olay veya belgeyle gerçekten "
             "ilişkilendirildiğini doğrula. Yanlış bilgiyi "
             "kaynakta doğru karşılığı varsa düzelt. "
+            "Dönem aralığını fermanın ilan aralığına "
+            "dönüştürme; 'Tanzimat Dönemi 1839-1876' ile "
+            "'Tanzimat Fermanı 1839' aynı iddia değildir. "
             "Karşılaştırmada iki tarafın istenen özelliği "
             "kaynakta ayrı ayrı açık değilse kanıtı yetersiz say. "
             "PDF tablosunda farklı satır veya kategori listelerindeki "
@@ -4107,7 +4213,9 @@ class RAGService:
             "Taslak yalnızca soruyu tekrarlıyorsa "
             "kaynaklardan gerçek cevabı yaz. Kaynakta "
             "desteklenmeyen hiçbir ayrıntıyı koruma veya "
-            "ekleme. Doğrulanmış cevabı en fazla dört "
+            "ekleme. Kaynak bölüm numarası, başlık alıntısı, "
+            "'ilgili kaynaklarda' ve 'gibi detaylar' "
+            "ifadelerini çıkar. Doğrulanmış cevabı en fazla dört "
             "cümleyle answer alanına yaz ve her bilgi "
             "cümlesine [K1] biçiminde kaynak ekle. "
             "source_ids yalnızca kullanılan kaynaklardır. "

@@ -4,6 +4,12 @@ Yalnızca gerçekten yapılan değişiklikler kaydedilir. Planlanan özellikler 
 
 ## Unreleased
 
+### Dönem–ilan ilişkisi ve kaynak metni temizliği — 2026-09-24
+
+- Kaynaktaki `Tanzimat Dönemi 1839-1876` aralığının `Tanzimat Fermanı 1839-1876 arasında ilan edildi` biçiminde yanlış bir olay ilişkisine dönüştürülmesi artık cevap yayımlanmadan reddedilir.
+- PDF bölüm numarası ve başlığı ile `ilgili kaynaklarda` / `gibi detaylar` türü kaynak hakkındaki meta ifadeler cevap sayılmaz; yerel model bunları üretirse güvenli, doğrudan kaynak karşılaştırmasına dönülür.
+- Bildirilen hatalı Tanzimat–Islahat çıktısı birebir regresyon testine eklendi. 222 Python testi, 19 JavaScript arayüz mantığı testi ve sözdizimi kontrolleri başarılıdır.
+
 ### Genel karşılaştırma kanıt dengesi — 2026-09-24
 
 - `Tanzimat ve Islahat fermanlarının farkları` gibi ortak isimli karşılaştırmalar artık iki ayrı kaynak aramasına bölünür; iki konu farklı PDF sayfalarında olsa da ikisi de cevap bağlamına dengeli biçimde alınır.

@@ -22,6 +22,8 @@ from app.rag import (
     _sources_are_relevant,
     _generic_comparison_evidence,
     _answer_has_source_support,
+    _range_claims_supported,
+    _contains_source_meta_claim,
 )
 from pypdf import PdfWriter
 from docx import Document as WordDocument
@@ -173,6 +175,37 @@ class CoreTests(unittest.TestCase):
                 grounded.replace("1856", "1908"),
                 question,
                 sources,
+            )
+        )
+
+    def test_period_range_cannot_become_edict_announcement_range(self):
+        source = (
+            "Tanzimat Dönemi 1839-1876 arasındadır. "
+            "Tanzimat Fermanı'nda Mustafa Reşit Paşa etkilidir."
+        )
+        self.assertFalse(
+            _range_claims_supported(
+                "Tanzimat Fermanı 1839-1876 yılları arasında ilan edilmiştir.",
+                [source],
+            )
+        )
+        self.assertTrue(
+            _range_claims_supported(
+                "Tanzimat Dönemi 1839-1876 arasındadır.",
+                [source],
+            )
+        )
+
+    def test_source_heading_and_meta_language_are_not_answer_claims(self):
+        self.assertTrue(
+            _contains_source_meta_claim(
+                "İlgili kaynaklarda '118. CİZYE VERGİSİNİN "
+                "KALDIRILMASIYLA İLİŞKİ' gibi detaylar bulunmaktadır."
+            )
+        )
+        self.assertFalse(
+            _contains_source_meta_claim(
+                "Islahat Fermanı gayrimüslimlere yeni haklar tanımıştır."
             )
         )
 
