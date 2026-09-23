@@ -224,7 +224,10 @@ class APITests(unittest.TestCase):
     def test_agent_rejects_shell(self):
         self.ready_document()
         self.model.tool_calls = [{"function": {"name": "shell", "arguments": {"command": "never execute"}}}]
-        result = self.ask("agent").json()
+        # İlk arama yeterliyse ajan bilinçli olarak planlama turunu atlar.
+        # Yasak araç denetimini boş ilk arama üzerinden gerçek ajan yolunda sınarız.
+        with patch.object(self.app.state.rag, "retrieve", return_value=[]):
+            result = self.ask("agent").json()
         self.assertTrue(any(step["tool"] == "rejected" for step in result["trace"]))
 
     def test_feedback_owner(self):
@@ -450,13 +453,16 @@ class APITests(unittest.TestCase):
                 self.assertEqual({s["subject_id"] for s in sources}, expected)
                 self.assertEqual(trace[0]["tool"], "search_notes")
 
-    def test_global_agent_endpoint_executes_read_only_search(self):
+    def test_global_agent_endpoint_skips_planner_when_initial_evidence_is_sufficient(self):
         self.ready_document()
         self.model.tool_calls = [{"function": {"name": "search_notes", "arguments": {"query": "Tanzimat Fermani"}}}]
-        result = self.client.post('/api/questions', json={"question": "Tanzimat ne zaman?", "mode": "agent"}, headers=self.headers).json()
+        with patch.object(self.model, "chat", wraps=self.model.chat) as chat:
+            result = self.client.post('/api/questions', json={"question": "Tanzimat ne zaman?", "mode": "agent"}, headers=self.headers).json()
         self.assertEqual(result["outcome"], "answered")
         self.assertEqual(result["scope"]["type"], "all")
-        self.assertTrue(any(s.get("query") == "Tanzimat Fermani" and s["found"] > 0 for s in result["trace"]))
+        self.assertTrue(any(s["tool"] == "agent_research_skipped" for s in result["trace"]))
+        self.assertFalse(any(call.kwargs.get("tools") for call in chat.call_args_list))
+        self.assertIsNotNone(self.model.tool_calls)
 
     def test_agent_can_recover_when_initial_search_is_empty(self):
         self.ready_document()
@@ -488,7 +494,10 @@ class APITests(unittest.TestCase):
                 self.model.tool_calls = [{"function": {"name": name, "arguments": arguments}}]
                 sources, trace = self.app.state.rag.agent_search(db, user, None, "Tanzimat", [])
                 self.assertEqual(sources, [])
-                self.assertEqual(trace, [{"tool": "rejected", "found": 0}])
+                rejected = [step for step in trace if step["tool"] == "rejected"]
+                self.assertEqual(len(rejected), 1)
+                self.assertEqual(rejected[0]["found"], 0)
+                self.assertIn("elapsed_ms", rejected[0])
 
     def test_agent_accepts_json_arguments_and_rejects_malformed_calls(self):
         self.ready_document()

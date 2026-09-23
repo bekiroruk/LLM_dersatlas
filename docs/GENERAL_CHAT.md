@@ -92,7 +92,12 @@ Arama kapsamını Tüm dersler bırak; sol menüdeki ders önemli değil. Yalnı
 | Tarih filtresi + Python'da liste nasıl oluşturulur? | Kaynak yetersiz; sahte tarih atfı yok |
 | Tüm dersler + ajan + notlarda bulunan bir karşılaştırma sorusu | Kaynaklı cevap; “Arama ve doğrulama adımlarını göster” altında gerçek adımlar |
 
-Ajan kaynakları yeterli bulursa ek araç çağrısı yapmadan durabilir; her soruda mutlaka üç tur çalışmaz. Doğru yıl tek bir PDF'de bulunuyorsa o PDF'nin erişilebilir ve Hazır olması gerekir; doğru parçanın bulunması ayrıca kontrol edilir. Yıl uygulama koduna sabitlenmez.
+Ajanın ilk araması yeterli ve ilgili kanıt sağlıyorsa planlama modeli hiç
+çalıştırılmaz. İlk arama boş, ilgisiz veya çok ölçütlü kanıt eksikse ajan ek
+aramaya geçer; her soruda mutlaka üç tur çalışmaz. Arama ve doğrulama adımları
+model ve arama sürelerini ayrı gösterir. Doğru yıl tek bir PDF'de bulunuyorsa o
+PDF'nin erişilebilir ve Hazır olması gerekir; doğru parçanın bulunması ayrıca
+kontrol edilir. Yıl uygulama koduna sabitlenmez.
 
 ## Mevcut SQLite şeması
 
@@ -108,7 +113,15 @@ Yeni DB şeması nullable alanla oluşturulur. Eski SQL Server şemasında otoma
 
 ## Doğrulama sınırı
 
-Güncel `source-contract-v16` sürümünde 203 Python testi ve 17 JavaScript arayüz mantığı testi başarılı. API/depolama testleri gerçek SQLite ve gömülü Qdrant kullanır; model gereken senaryolarda deterministik test çifti vardır. Kullanıcının yüklediği gerçek bitki PDF'si, ayrı doğru yağış satırları ve bildirilen bozuk/eksik iklim parçaları aynı gerçek metin çıkarma, parçalama, SQLite ve gömülü Qdrant yolundan geçirilmiştir. Bildirilen çok ölçütlü iklim sorusu dört gerekli kanıt hücresini doğru kaynaklardan bulmuş; sütunları kaymış tabloyu, PDF içindeki ilgisiz yağış ifadelerini, tam rejim göstermeyen kısa parçaları ve kullanıcıya taşınmaması gereken kırpılmış hücre/sınav notlarını kullanmamıştır. Gerçek genel ajan raporunda bulunan cevap anahtarsız soru kataloğu, bozuk hükümdar adı ve yalnızca tarih taşıyan dağınık fetih cevabı ayrı regresyonlarla engellenmiştir. Tam kanıt bulunmazsa model çağrılmadan kaynak yetersiz sonucu verilir. Arayüz testleri DOM test çiftidir; gerçek görsel tarayıcı testi değildir. Güncel Windows sonucu uygulama çekilip başlatıldıktan sonra ayrıca görülecektir.
+Güncel `adaptive-agent-v17` sürümünde 211 Python testi ve 17 JavaScript
+arayüz mantığı testi başarılı. API/depolama testleri gerçek SQLite ve gömülü
+Qdrant kullanır; model gereken senaryolarda deterministik test çifti vardır.
+Kaynak sözleşmesi v16'daki yanlış tablo, soru kataloğu, bozuk hükümdar adı ve
+eksik olay kanıtı regresyonlarını korur. Yeni uyarlamalı ajan testi; yeterli ilk
+kanıtta araç planlamasının atlandığını, boş ilk aramada araştırmanın sürdüğünü,
+yasak araçların reddedildiğini ve araç planlamasının daha kısa üretim bütçesi
+kullandığını doğrular. Arayüz testleri DOM test çiftidir; gerçek görsel tarayıcı
+testi değildir. Gecikme kazanımı Windows/Ollama kabul raporuyla ayrıca ölçülür.
 
 Uygulamada değişiklik yaptıktan sonra gün sonu paylaşımı için [geliştirme rehberi](DEVELOPMENT.md) kullanılır.
 

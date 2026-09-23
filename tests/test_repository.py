@@ -186,6 +186,21 @@ class WindowsLauncherTests(unittest.TestCase):
         self.assertIn("$stderrLog", start)
         self.assertIn("Remove-Item $pidFile", stop)
 
+    def test_acceptance_runner_starts_checks_and_uses_unique_report(self):
+        root = Path(__file__).resolve().parents[1]
+        script = (root / "scripts" / "acceptance.ps1").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn('Resolve-Path (Join-Path $PSScriptRoot "..")', script)
+        self.assertIn('"start.ps1"', script)
+        self.assertIn("/health", script)
+        self.assertIn('"evaluate.py"', script)
+        self.assertIn("--mode agent", script)
+        self.assertIn("--with-generation", script)
+        self.assertIn('Get-Date -Format "yyyyMMdd-HHmmss"', script)
+        self.assertNotIn("--password", script)
+
 
 if __name__ == "__main__":
     unittest.main()

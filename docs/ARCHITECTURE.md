@@ -84,7 +84,13 @@ Doküman yükleme ekranındaki ders seçimi ile sohbetin arama kapsamı ayrıdı
 
 Global arama için Qdrant filtresini tamamen kaldırmak yeterli ve güvenli bir çözüm değildir.
 
-Araştırma ajanının tek aracı search_notes(query)'dir. Varsayılan en fazla 3 tur ve tur başına 2 çağrı yapar; toplam en fazla 10 kaynak biriktirir. Araç parametresinde ders veya kullanıcı seçilemez. Her arama sunucudaki erişim kontrolünden geçer. Shell, SQL, ağ veya yazma/silme aracı yoktur. Son cevap mevcut RAG kanıt kontrollerinden geçer; ajan cevabın kesin doğru olmasını garanti etmez.
+Araştırma ajanının tek aracı search_notes(query)'dir. İlk arama yeterli ve ilgili
+kanıt sağlıyorsa planlama modeli çalıştırılmaz. İlk arama boşsa, ilgisizse veya
+çok ölçütlü kanıt eksikse ajan varsayılan en fazla 3 tur ve tur başına 2 çağrı
+yapar; toplam en fazla 10 kaynak biriktirir. Araç parametresinde ders veya
+kullanıcı seçilemez. Her arama sunucudaki erişim kontrolünden geçer. Shell, SQL,
+ağ veya yazma/silme aracı yoktur. Son cevap mevcut RAG kanıt kontrollerinden
+geçer; ajan cevabın kesin doğru olmasını garanti etmez.
 
 ## Kalıcı ve geçici veri
 

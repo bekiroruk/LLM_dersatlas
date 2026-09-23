@@ -25,6 +25,7 @@ Ders materyalleri, yerel ortam ayarları, veritabanı ve vektör indeksleri akta
 - Genel ajan kabul aracı Tarih, Coğrafya, Vatandaşlık ve kaynak-dışı soruları ders seçmeden çalıştıracak şekilde hazırlandı; kaynak/cevap kapsaması, çekimserlik ve gecikme ayrı raporlanır.
 - İlk gerçek sekiz soruluk ajan raporu Windows/Ollama üzerinde tamamlandı: cevaplanabilirlik doğruluğu 1,0; kaynak kapsaması 0,833; cevap kapsaması 0,75; p50 23,1 sn ve p95 41,5 sn. İnsan incelemesinde T01'de bozuk hükümdar adı, V01'de cevap anahtarsız soru kataloğu bulundu; ikisi `source-contract-v15` regresyonlarıyla kapatıldı.
 - v15 tekrarında kaynak ve cevap kapsaması 0,917'ye, p95 32,9 saniyeye yükseldi. V01 kapandı; T01 ise hükümdar kanıtı kısa listeden düşünce yalnızca tarih ve dağınık PDF satırlarıyla cevaplandı. `source-contract-v16` iki olay kanıtını tüm yetkili parçalarda tamamlar ve eksikse cevap vermeyi reddeder.
+- v17 gerçek Windows raporunda hazır kaynaklı sorularda uygulama doğruluğu 1,0 oldu. Tek uyumsuzluk, notlarda hükümdar ilişkisi bulunmayan T01 için güvenli rettir. p50 52,1 ve p95 68,2 saniyelik gecikmenin gereksiz ajan planlama turundan bir bölümü `adaptive-agent-v17` ile kaldırıldı.
 
 ## Doğrulama
 
@@ -50,6 +51,12 @@ Genel ajan kabul aracı eklendikten sonra 197 Python ve 17 DOM mantık testi ba�
 
 `source-contract-v16` doğrulamasında 203 Python ve 17 DOM mantık testi başarılı. Fetih tarih ve hükümdar parçalarının genel benzerlik sıralayıcıları boş sonuç verse bile birlikte bulunması, yalnızca tarih varsa güvenli ret verilmesi ve başlatıcının boş günlük yerine çıkış tanısı göstermesi test edildi.
 
+`adaptive-agent-v17` doğrulamasında 211 Python ve 17 DOM mantık testi
+başarılı. Yeterli ilk kanıtta ajan planlaması atlanır; eksik/boş kanıtta güvenli
+arama yolu korunur. Model ve arama adımlarının süreleri arayüzde görünür. Tek
+komutluk `scripts/acceptance.ps1`, doğru sürümü başlatır ve benzersiz adlı yerel
+kabul raporu üretir.
+
 ## Bilinen sınırlamalar
 
 - Hafıza sayfa yenilenince silinir; kalıcı sohbet geçmişi yoktur.
@@ -61,4 +68,7 @@ Genel ajan kabul aracı eklendikten sonra 197 Python ve 17 DOM mantık testi ba�
 
 ## Sıradaki adım
 
-Windows kurulumunda güncel kodu çekip başlatıcının gerçek kapanma tanısını görmek; ardından `source-contract-v16` üzerinde sekiz soruluk genel ajan kabul raporunu yeni çıktı adıyla çalıştırmak. Yeni proje ZIP'i, doküman yükleme veya yeniden indeksleme gerekli değil.
+Windows kurulumunda güncel kodu çekip `.\scripts\acceptance.ps1` çalıştırmak;
+oluşan rapordaki p50/p95 değerlerini v17'nin 52,1/68,2 saniyelik tabanıyla
+karşılaştırmak. Yeni proje ZIP'i, doküman yükleme veya yeniden indeksleme gerekli
+değil.

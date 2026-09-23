@@ -57,7 +57,10 @@ class Ollama:
                 "top_k": 1,
                 "top_p": 1.0,
                 "num_ctx": 6144,
-                "num_predict": 800,
+                # Araç seçimi kısa bir JSON çağrısıdır. Yanıt üretimi için
+                # yeterli bütçeyi korurken ajan planlamasında gereksiz uzun
+                # üretimi ve RTX 3060 sınıfı makinelerde beklemeyi sınırla.
+                "num_predict": 192 if tools else 512,
             },
         }
         if tools:

@@ -116,3 +116,11 @@ Windows'ta yerel Qwen ve yüklenmiş notlarla yapılan ilk sekiz soruluk ajan ko
 `source-contract-v15` cevap anahtarı bulunmayan soru kataloglarını arama kanıtından, alıntı yolundan ve geçerli model cevabından çıkarır. Fetih cevabında `I. Fatih Sultan` gibi bozuk sıra sayısı + unvan birleşimleri reddedilir; aynı olay bloğundaki tam hükümdar adı tercih edilir. Kabul ölçümü `TBMM` ve `Türkiye Büyük Millet Meclisi` gibi eşdeğer doğru ifadeleri alternatif olarak değerlendirebilir. Bu davranışlar API, kaynak sözleşmesi, çekirdek ve değerlendirme aracı testleriyle korunur.
 
 v15 tekrarında V01 düzeldi; toplam kaynak ve cevap kapsaması 0,917 oldu. Kalan T01 çıktısı yalnızca `29 Mayıs 1453` bilgisini taşıyor, hükümdarı söylemiyor ve üç ayrı geniş PDF parçasını cevap gibi gösteriyordu. `source-contract-v16`, tarih + hükümdar isteyen fetih sorularını iki zorunlu olay kanıtı olarak ele alır. Bu parçalar tüm yetkili hazır notlarda aranır; ikisi de açıkça bulunursa kısa ve deterministik cevap kurulur, biri eksikse model ve alıntı yolları kapatılarak kaynak yetersiz sonucu verilir.
+
+v17 gerçek Windows raporunda hazır kaynaklı yedi soruda uygulama doğruluğu
+1,0; tüm kümede cevaplanabilirlik 0,875; kaynak kapsaması 0,917 ve cevap
+kapsaması 0,833 ölçüldü. Tek uyumsuzluk, kaynakta hükümdar ilişkisi bulunmayan
+T01 için bilinçli güvenli rettir. Bu koşunun p50/p95 değerleri 52,1/68,2
+saniyeydi. `adaptive-agent-v17`, ilk arama yeterliyse ek ajan planlama çağrısını
+atlayarak aynı kaynak ve doğrulama sözleşmesini daha az model turuyla yürütür.
+Yeni süreler gerçek Windows/Ollama kabul koşusunda karşılaştırılacaktır.

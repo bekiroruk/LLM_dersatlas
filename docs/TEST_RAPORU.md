@@ -1,8 +1,10 @@
-# Doğrulama raporu — 21 Eylül 2026
+# Doğrulama raporu — 23 Eylül 2026
 
 ## Sonuç
 
-Yerel Linux/Python 3.12 ortamında **203 Python testi** ve **17 JavaScript arayüz mantığı testi** başarılıdır. Python testlerinde atlama başarı sayılmaz. Sözdizimi ve paylaşım kapsamı kontrolleri de geçmiştir.
+Yerel Linux/Python 3.12 ortamında **211 Python testi** ve **17 JavaScript
+arayüz mantığı testi** başarılıdır. Python testlerinde atlama başarı sayılmaz.
+Sözdizimi ve paylaşım kapsamı kontrolleri de geçmiştir.
 
 Kullanıcının Windows/Ollama kabulünde `source-contract-v14`, bildirilen Karadeniz–Akdeniz yağış ve bitki örtüsü karşılaştırmasını doğru, temiz ve kaynaklı üretmiştir.
 
@@ -14,6 +16,7 @@ Kullanıcının Windows/Ollama kabulünde `source-contract-v14`, bildirilen Kara
 | Çok dersli genel arama | Başarılı | Sahiplik/üyelik birleşimi, isteğe bağlı ders filtresi, yetki iptali |
 | RAG kaynak sözleşmesi | Başarılı | Kaynaksız çekimserlik, atıf doğrulama, yanlış kaynak reddi |
 | Araştırma ajanı | Başarılı | Yalnızca `search_notes`, kapsam aşımı/yazma/shell/ağ/SQL reddi, tur sınırı |
+| Uyarlamalı ajan hızı | Başarılı | Yeterli ilk kanıtta planlama atlama, boş aramada devam, kısa araç üretim bütçesi ve süre görünürlüğü |
 | Sohbet bağlamı | Başarılı | 4 tur/6000 karakter, takip sorusu, kapsam değişimi, temizleme |
 | İklim karşılaştırması regresyonu | Başarılı | Bozuk PDF tablosu, eksik ilişki, kırpılmış hücre ve sınav notu temizliği |
 | Soru kataloğu ve kişi adı regresyonu | Başarılı | Cevapsız soru listesini kanıt saymama; bozuk hükümdar adını reddetme |
@@ -24,14 +27,10 @@ Kullanıcının Windows/Ollama kabulünde `source-contract-v14`, bildirilen Kara
 
 ## Gerçek model kabul aracı
 
-`samples/general_evaluation.json`, Tarih, Coğrafya, Vatandaşlık ve kaynak-dışı sorulardan oluşan sekiz soruluk başlangıç kümesidir. Aşağıdaki komut gerçek yerel Ollama modeliyle genel ajan raporu üretir:
+`samples/general_evaluation.json`, Tarih, Coğrafya, Vatandaşlık ve kaynak-dışı sorulardan oluşan sekiz soruluk başlangıç kümesidir. Aşağıdaki komut uygulamayı doğru sürümle başlatır ve gerçek yerel Ollama modeliyle benzersiz adlı genel ajan raporu üretir:
 
 ```powershell
-.\.venv\Scripts\python.exe scripts\evaluate.py `
-  --mode agent `
-  --with-generation `
-  --dataset samples\general_evaluation.json `
-  --output output\agent-evaluation.json
+.\scripts\acceptance.ps1
 ```
 
 Rapor şu ölçüleri ayrı tutar:

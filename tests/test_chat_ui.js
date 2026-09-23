@@ -55,7 +55,7 @@ const context = vm.createContext({
     if (url === '/api/me') data = user;
     else if (url === '/api/subjects') data = availableSubjects;
     else if (url.endsWith('/documents')) data = [];
-    else if (url === '/api/system') data = { model: { reachable: true, chat_ready: true, embed_ready: true }, qdrant_ready: true, max_upload_mb: 20, worker_enabled: true, rag_revision: '2026-09-23-source-contract-v16', database: 'SQLite', version: '0.1.0', chat_model: 'qwen3:4b', embedding_model: 'bge-m3', vector_mode: 'Qdrant gömülü' };
+    else if (url === '/api/system') data = { model: { reachable: true, chat_ready: true, embed_ready: true }, qdrant_ready: true, max_upload_mb: 20, worker_enabled: true, rag_revision: '2026-09-23-adaptive-agent-v17', database: 'SQLite', version: '0.1.0', chat_model: 'qwen3:4b', embedding_model: 'bge-m3', vector_mode: 'Qdrant gömülü' };
     else if (url === '/api/dashboard') data = { ready: 3, chunks: 3, query_count: 0, insufficient: 0, p50_ms: null, p95_ms: null, positive_feedback: 0, errors: 0 };
     else if (url === '/api/questions') {
       const body = JSON.parse(options.body); requests.push(body);
@@ -80,8 +80,8 @@ function check(description, test) { test(); passed++; console.log('OK: ' + descr
 async function main() {
   await new Promise(setImmediate); // Başlangıçtaki sahte API mikro-görevlerini tamamla.
   check('Çalışan RAG sürümü ana ekranda görünür', () => {
-    assert.ok(get('model-badge').textContent.includes('RAG v16'));
-    assert.ok(get('model-badge').title.includes('source-contract-v16'));
+    assert.ok(get('model-badge').textContent.includes('RAG v17'));
+    assert.ok(get('model-badge').title.includes('adaptive-agent-v17'));
   });
   check('Varsayılan Genel Sohbet, tüm dersler ve boş doküman seçimi gönderimi engellemez', () => {
     assert.equal(get('page-title').textContent, 'Genel Sohbet');
@@ -164,6 +164,8 @@ async function main() {
     { tool: 'evidence_coverage', found: 4, required: 4 },
     { tool: 'structured_evidence_answer' },
     { tool: 'direct_evidence_answer' },
+    { tool: 'draft_model', elapsed_ms: 1234 },
+    { tool: 'agent_research_skipped', reason: 'initial_evidence_sufficient', found: 2 },
   ];
   questionMethod = 'source_excerpt';
   get('question').value = 'Başka bir bağlam denemesi';
@@ -186,6 +188,8 @@ async function main() {
     assert.ok(text.includes('Sorunun bütün ölçütleri için kanıt kapsaması · 4/4 kanıt'));
     assert.ok(text.includes('Doğrudan kaynak değerinden kısa cevap oluşturuldu'));
     assert.ok(text.includes('Doğrulanmış kaynaklardan karşılaştırma oluşturuldu'));
+    assert.ok(text.includes('Kaynaklı cevap taslağı · 1.2 sn'));
+    assert.ok(text.includes('İlk kaynaklar yeterli; ek araştırma atlandı'));
   });
   questionAnswer = 'Uzun cevap '.repeat(300);
   for (let index = 0; index < 7; index++) {

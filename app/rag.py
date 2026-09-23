@@ -1,6 +1,7 @@
 import json
 import math
 import re
+import time
 import unicodedata
 from difflib import SequenceMatcher
 from typing import Literal
@@ -16,7 +17,7 @@ from .ranking import bm25, reciprocal_rank_fusion
 from .security import search_subject_ids
 
 
-RAG_REVISION = "2026-09-23-source-contract-v16"
+RAG_REVISION = "2026-09-23-adaptive-agent-v17"
 
 
 NO_EVIDENCE = (
@@ -1404,6 +1405,28 @@ def _sources_are_relevant(question, sources):
             return True
 
     return False
+
+
+def _agent_research_needed(question, sources, covered_slots, required_slots):
+    """İlk arama yeterliyse pahalı ajan planlama turunu çalıştırmaz."""
+    if not sources:
+        return True, "initial_search_empty"
+
+    if required_slots:
+        if covered_slots < required_slots:
+            return True, "evidence_incomplete"
+        return False, "evidence_complete"
+
+    # Bilinen tablo karşılaştırmaları yukarıdaki kanıt hücreleriyle ölçülür.
+    # Serbest biçimli karşılaştırmalarda ise ikinci tarafı/ölçütü kaçırmamak
+    # için araştırma ajanı sorguyu alt aramalara ayırmaya devam eder.
+    if _is_comparison_question(question):
+        return True, "comparison_research"
+
+    if not _sources_are_relevant(question, sources):
+        return True, "initial_sources_irrelevant"
+
+    return False, "initial_evidence_sufficient"
 
 
 def _normalize_citation_shapes(answer):
@@ -3283,6 +3306,7 @@ class RAGService:
             "Aşağıdaki şemayı cevap olarak kopyalama; bu şemaya uygun bir JSON nesnesi üret."
             "\nÇIKTI ŞEMASI:\n" + json.dumps(schema, ensure_ascii=False)
         )
+        started = time.perf_counter()
         message = self.model.chat(
             [
                 {
@@ -3296,6 +3320,10 @@ class RAGService:
             ],
             schema=schema,
         )
+        trace.append({
+            "tool": f"{phase}_model",
+            "elapsed_ms": round((time.perf_counter() - started) * 1000),
+        })
 
         try:
             return _parse_payload(
@@ -3325,6 +3353,7 @@ class RAGService:
             + "alanlarını içeren geçerli JSON döndür."
         )
 
+        retry_started = time.perf_counter()
         retry_message = self.model.chat(
             [
                 {
@@ -3338,6 +3367,10 @@ class RAGService:
             ],
             schema=schema,
         )
+        trace.append({
+            "tool": f"{phase}_format_retry_model",
+            "elapsed_ms": round((time.perf_counter() - retry_started) * 1000),
+        })
 
         try:
             return _parse_payload(
@@ -3463,6 +3496,7 @@ class RAGService:
             question
         )
 
+        retrieval_started = time.perf_counter()
         sources = self.retrieve(
             db,
             user,
@@ -3478,6 +3512,9 @@ class RAGService:
                 "found": len(sources),
                 "scope": "all" if subject_id is None else "subject",
                 "subject_id": subject_id,
+                "elapsed_ms": round(
+                    (time.perf_counter() - retrieval_started) * 1000
+                ),
             }
         ]
 
@@ -3489,22 +3526,33 @@ class RAGService:
                 "required": required_slots,
             })
 
-        # İlk arama sonuçsuz kalsa da ajan sorguyu yeniden yazabilir. Ancak
-        # kapsamda hiç hazır not/izin yoksa boşuna model çağırmaz.
+        # İlk arama sonuçsuz veya kanıt eksikse ajan sorguyu yeniden yazabilir.
+        # İlk arama yeterliyse aynı kaynakları yeniden aratmak hem gecikmeyi
+        # hem de küçük modelin yanlış yöne sapma ihtimalini artırır.
         if mode == "agent" and (
             sources or self.has_searchable_notes(db, user, subject_id)
         ):
-            sources, agent_trace = (
-                self.agent_search(
+            research_needed, reason = _agent_research_needed(
+                question,
+                sources,
+                covered_slots,
+                required_slots,
+            )
+            if research_needed:
+                sources, agent_trace = self.agent_search(
                     db,
                     user,
                     subject_id,
                     question,
                     sources,
                 )
-            )
-
-            trace.extend(agent_trace)
+                trace.extend(agent_trace)
+            else:
+                trace.append({
+                    "tool": "agent_research_skipped",
+                    "reason": reason,
+                    "found": len(sources),
+                })
 
         if not sources:
             return {
@@ -4025,21 +4073,36 @@ class RAGService:
             },
         ]
 
-        for _ in range(
+        for round_index in range(
             self.settings.agent_max_rounds
         ):
+            planning_started = time.perf_counter()
             message = self.model.chat(
                 messages,
                 tools=[SEARCH_TOOL],
             )
+            planning_ms = round(
+                (time.perf_counter() - planning_started) * 1000
+            )
 
             calls = message.get("tool_calls") or []
             if not isinstance(calls, list):
-                trace.append({"tool": "rejected", "found": 0})
+                trace.append({
+                    "tool": "rejected",
+                    "found": 0,
+                    "round": round_index + 1,
+                    "elapsed_ms": planning_ms,
+                })
                 break
             calls = calls[:2]
 
             if not calls:
+                trace.append({
+                    "tool": "agent_planning",
+                    "found": 0,
+                    "round": round_index + 1,
+                    "elapsed_ms": planning_ms,
+                })
                 break
 
             messages.append(
@@ -4071,6 +4134,7 @@ class RAGService:
                     if len(args.query.strip()) < 3:
                         raise ValueError("Boş arama")
 
+                    search_started = time.perf_counter()
                     results = self.retrieve(
                         db,
                         user,
@@ -4093,6 +4157,11 @@ class RAGService:
                             "tool": "search_notes",
                             "query": args.query,
                             "found": len(results),
+                            "round": round_index + 1,
+                            "planning_ms": planning_ms,
+                            "elapsed_ms": round(
+                                (time.perf_counter() - search_started) * 1000
+                            ),
                         }
                     )
 
@@ -4115,6 +4184,8 @@ class RAGService:
                         {
                             "tool": "rejected",
                             "found": 0,
+                            "round": round_index + 1,
+                            "elapsed_ms": planning_ms,
                         }
                     )
 
