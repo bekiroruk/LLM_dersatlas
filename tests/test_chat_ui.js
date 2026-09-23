@@ -7,6 +7,7 @@ const vm = require('node:vm');
 const root = path.join(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'dist/index.html'), 'utf8');
 const source = fs.readFileSync(path.join(root, 'dist/assets/app.js'), 'utf8');
+const styles = fs.readFileSync(path.join(root, 'dist/assets/app.css'), 'utf8');
 const elements = new Map();
 
 class Element {
@@ -82,6 +83,18 @@ async function main() {
   check('Çalışan RAG sürümü ana ekranda görünür', () => {
     assert.ok(get('model-badge').textContent.includes('RAG v17'));
     assert.ok(get('model-badge').title.includes('adaptive-agent-v17'));
+  });
+  check('Modern tasarım sistemi erişilebilir ve uyarlanabilir yapı taşlarını içerir', () => {
+    assert.ok(html.includes('name="theme-color"'));
+    assert.ok(html.includes('id="question-counter"'));
+    assert.ok(styles.includes('@media (max-width: 720px)'));
+    assert.ok(styles.includes('@media (prefers-reduced-motion: reduce)'));
+    assert.ok(styles.includes('--shadow-md:'));
+  });
+  get('question').value = 'Kısa soru';
+  get('question').events.input();
+  check('Soru alanı karakter sayısını anlık gösterir', () => {
+    assert.equal(get('question-counter').textContent, '9 / 1200');
   });
   check('Varsayılan Genel Sohbet, tüm dersler ve boş doküman seçimi gönderimi engellemez', () => {
     assert.equal(get('page-title').textContent, 'Genel Sohbet');

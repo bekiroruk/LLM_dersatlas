@@ -4,6 +4,11 @@ const $ = (id) => document.getElementById(id);
 const state = { user: null, subjects: [], subject: null, searchSubject: null, documents: [], view: 'study', busy: false, deleteId: null, timer: null, history: [], chatEpoch: 0 };
 const MAX_HISTORY_TURNS = 4, MAX_HISTORY_CHARS = 6000;
 const labels = { queued: 'Sırada', processing: 'İşleniyor', ready: 'Hazır', error: 'Hata', deleting: 'Siliniyor', delete_error: 'Silme hatası' };
+const promptSuggestions = [
+  ['Tanzimat ve Islahat fermanlarının farkları nelerdir?', 'T', 'Tarih', 'Fermanları karşılaştır', 'history-icon'],
+  ["Türkiye'deki iklim tiplerinin temel özellikleri nelerdir?", 'C', 'Coğrafya', 'İklim tiplerini incele', 'geography-icon'],
+  ['Notlarıma göre yasama, yürütme ve yargı görevleri nelerdir?', 'V', 'Vatandaşlık', 'Kuvvetleri öğren', 'civics-icon'],
+];
 function node(tag, text, className) { const element = document.createElement(tag); if (text !== undefined) element.textContent = text; if (className) element.className = className; return element; }
 function toast(message, error = false) { const box = $('toast'); box.textContent = message; box.className = 'toast' + (error ? ' error' : ''); box.hidden = false; clearTimeout(state.timer); state.timer = setTimeout(() => { box.hidden = true; }, 6500); }
 async function api(path, options = {}) {
@@ -61,6 +66,28 @@ function showLogin() {
   $('document-rows').replaceChildren(); $('system-cards').replaceChildren(); $('metric-cards').replaceChildren();
   $('login-view').hidden = false; $('app-view').hidden = true; $('password').value = '';
 }
+function suggestionButton([question, letter, title, detail, tone]) {
+  const button = node('button'); button.dataset.question = question;
+  const icon = node('span', letter, 'suggestion-icon ' + tone);
+  const copy = node('span'); copy.append(node('strong', title), node('small', detail));
+  button.append(icon, copy, node('i', '→'));
+  button.addEventListener('click', () => { $('question').value = question; updateQuestionComposer(); $('question').focus(); });
+  return button;
+}
+function renderWelcome() {
+  const welcome = node('div', undefined, 'welcome');
+  const orb = node('div', undefined, 'welcome-orb'); orb.setAttribute('aria-hidden', 'true'); orb.append(node('span', '✦'));
+  const heading = node('h3'); heading.append(node('span', 'Bugün hangi konuyu'), document.createElement('br'), node('em', 'netleştirelim?'));
+  const description = node('p'); description.id = 'welcome-text';
+  const suggestions = node('div', undefined, 'suggestions'); suggestions.append(...promptSuggestions.map(suggestionButton));
+  welcome.append(orb, node('span', '01 / KEŞFET', 'section-number'), heading, description, node('div', 'HIZLI BAŞLANGIÇ', 'suggestion-label'), suggestions);
+  return welcome;
+}
+function updateQuestionComposer() {
+  const field = $('question'), length = field.value.length;
+  $('question-counter').textContent = length + ' / 1200';
+  if (field.style) { field.style.height = 'auto'; field.style.height = Math.min(field.scrollHeight || 67, 180) + 'px'; }
+}
 function setView(view) {
   state.view = view;
   for (const key of ['study', 'documents', 'system']) $(key + '-view').hidden = key !== view;
@@ -101,11 +128,7 @@ async function loadSubjects(preferred) {
 }
 function clearChat() {
   resetConversation();
-  $('messages').replaceChildren();
-  const welcome = node('div', undefined, 'welcome');
-  const description = node('p'); description.id = 'welcome-text';
-  welcome.append(node('span', '01 / KEŞFET', 'section-number'), node('h3', 'Hangi konuyu netleştirelim?'), description);
-  $('messages').append(welcome); renderSources([]);
+  $('messages').replaceChildren(renderWelcome()); renderSources([]);
   updateChatScope();
 }
 function renderSources(sources) {
@@ -186,7 +209,7 @@ async function submitQuestion(event) {
   const requestUserId = state.user?.id;
   const requestChatEpoch = state.chatEpoch, requestedHistory = state.history.map(turn => ({ ...turn }));
   const requestedSubject = state.searchSubject, requestedMode = $('mode').value, requestedScopeName = scopeName();
-  state.busy = true; $('send').disabled = true; $('subject-select').disabled = true; $('search-subject-select').disabled = true; $('mode').disabled = true; $('clear-chat').disabled = true; $('add-subject').disabled = true; $('question').value = '';
+  state.busy = true; $('send').disabled = true; $('send-label').textContent = 'Hazırlanıyor'; $('subject-select').disabled = true; $('search-subject-select').disabled = true; $('mode').disabled = true; $('clear-chat').disabled = true; $('add-subject').disabled = true; $('question').value = ''; updateQuestionComposer();
   $('messages').querySelector('.welcome')?.remove();
   const item = node('article', undefined, 'message'); item.append(node('div', question, 'message-user'), node('p', requestedScopeName + ' · ' + (requestedMode === 'agent' ? 'Araştırma ajanı' : 'RAG'), 'answer-scope'));
   const pending = node('p', requestedMode === 'agent' ? 'Ajan ' + requestedScopeName + ' kapsamındaki kaynakları araştırıyor…' : 'Notlar aranıyor, kaynaklı yanıt hazırlanıyor…', 'pending'); item.append(pending); $('messages').append(item); pending.scrollIntoView({ block: 'nearest' });
@@ -195,13 +218,13 @@ async function submitQuestion(event) {
     if (state.user?.id !== requestUserId || state.chatEpoch !== requestChatEpoch) { pending.remove(); return; }
     rememberTurn(question, result, requestedSubject);
     if (result.context_used) item.append(node('p', 'Bağlamla anlaşılan soru: ' + result.resolved_question, 'answer-meta'));
-    pending.remove(); item.append(node('div', 'DERSATLAS / KAYNAKLI ÇALIŞMA', 'answer-label'), node('div', result.answer, 'message-answer'));
+    pending.remove(); item.className = 'message outcome-' + result.outcome; item.append(node('div', 'DERSATLAS / KAYNAKLI ÇALIŞMA', 'answer-label'), node('div', result.answer, 'message-answer'));
     const outcomes = { answered: 'Kaynak referansları kontrol edildi', insufficient: 'Kaynak yetersiz', invalid_output: 'Çıktı biçimi doğrulanamadı', invalid_citations: 'Kaynak referansı geçersiz' };
     const outcomeLabel = result.answer_method === 'source_excerpt' ? 'Kaynak metninden doğrudan alıntı' : (outcomes[result.outcome] || result.outcome);
     item.append(node('p', outcomeLabel + ' · ' + (result.elapsed_ms / 1000).toFixed(1) + ' sn', 'answer-meta'));
     const actions = node('div', undefined, 'answer-actions');
-    const sourceButton = node('button', 'Bu cevabın kaynaklarını aç'); sourceButton.addEventListener('click', () => renderSources(result.sources)); actions.append(sourceButton);
-    for (const [label, value] of [['Faydalı', 1], ['Kontrol gerekli', -1]]) { const button = node('button', label); button.addEventListener('click', async () => { try { await api('/api/queries/' + result.query_id + '/feedback', { method: 'POST', body: { value } }); toast('Geri bildirimin kaydedildi.'); } catch (e) { toast(e.message, true); } }); actions.append(button); }
+    const sourceButton = node('button', 'Kaynakları aç · ' + result.sources.length); sourceButton.addEventListener('click', () => { renderSources(result.sources); if (window.innerWidth <= 920) $('sources').scrollIntoView?.({ block: 'start', behavior: 'smooth' }); }); actions.append(sourceButton);
+    for (const [label, value] of [['Faydalı', 1], ['Kontrol gerekli', -1]]) { const button = node('button', label); button.addEventListener('click', async () => { try { await api('/api/queries/' + result.query_id + '/feedback', { method: 'POST', body: { value } }); button.className = 'selected'; toast('Geri bildirimin kaydedildi.'); } catch (e) { toast(e.message, true); } }); actions.append(button); }
     item.append(actions);
     if (requestedMode === 'agent' || result.trace.length > 1) {
       const details = node('details', undefined, 'trace'); details.append(node('summary', 'Arama ve doğrulama adımlarını göster'));
@@ -215,7 +238,7 @@ async function submitQuestion(event) {
     }
     renderSources(result.sources);
   } catch (e) { pending.remove(); if (state.user?.id === requestUserId && state.chatEpoch === requestChatEpoch) { item.append(node('p', e.message, 'error')); $('question').value = question; } }
-  finally { state.busy = false; $('subject-select').disabled = false; $('search-subject-select').disabled = false; $('mode').disabled = false; $('clear-chat').disabled = false; $('add-subject').disabled = false; updateChatScope(); if (state.user) await refreshDocuments().catch(() => {}); }
+  finally { state.busy = false; $('send-label').textContent = 'Soruyu gönder'; $('subject-select').disabled = false; $('search-subject-select').disabled = false; $('mode').disabled = false; $('clear-chat').disabled = false; $('add-subject').disabled = false; updateChatScope(); if (state.user) await refreshDocuments().catch(() => {}); }
 }
 $('login-form').addEventListener('submit', async event => { event.preventDefault(); const button = event.target.querySelector('button'); button.disabled = true; $('login-error').textContent = ''; try { const user = await api('/api/login', { method: 'POST', body: { username: $('username').value.trim(), password: $('password').value } }); $('password').value = ''; await loadApp(user); } catch (e) { $('login-error').textContent = e.message; } finally { button.disabled = false; } });
 $('logout').addEventListener('click', async () => { try { await api('/api/logout', { method: 'POST' }); clearChat(); showLogin(); } catch (e) { toast(e.message, true); } });
@@ -226,6 +249,8 @@ $('search-subject-select').addEventListener('change', () => setSearchSubject($('
 $('mode').addEventListener('change', updateChatScope);
 $('clear-chat').addEventListener('click', clearChat);
 document.querySelectorAll('[data-question]').forEach(button => button.addEventListener('click', () => { $('question').value = button.dataset.question; $('question').focus(); }));
+$('question').addEventListener('input', updateQuestionComposer);
+$('question').addEventListener('keydown', event => { if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); submitQuestion(); } });
 $('question-form').addEventListener('submit', submitQuestion);
 $('file-input').addEventListener('change', event => uploadFiles([...event.target.files]).catch(e => toast(e.message, true)));
 for (const type of ['dragenter', 'dragover']) $('upload-zone').addEventListener(type, event => { event.preventDefault(); $('upload-zone').classList.add('dragging'); });

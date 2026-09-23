@@ -2,11 +2,13 @@
 
 ## Sonuç
 
-Yerel Linux/Python 3.12 ortamında **211 Python testi** ve **17 JavaScript
+Yerel Linux/Python 3.12 ortamında **211 Python testi** ve **19 JavaScript
 arayüz mantığı testi** başarılıdır. Python testlerinde atlama başarı sayılmaz.
 Sözdizimi ve paylaşım kapsamı kontrolleri de geçmiştir.
 
 Kullanıcının Windows/Ollama kabulünde `source-contract-v14`, bildirilen Karadeniz–Akdeniz yağış ve bitki örtüsü karşılaştırmasını doğru, temiz ve kaynaklı üretmiştir.
+Son `adaptive-agent-v17` kabulünde hazır kaynaklı uygulama doğruluğu 1,0; p50
+8,9 saniye ve p95 15,0 saniyedir.
 
 ## Doğrulanan alanlar
 
@@ -23,7 +25,7 @@ Kullanıcının Windows/Ollama kabulünde `source-contract-v14`, bildirilen Kara
 | Fetih olay kanıtı tamamlama | Başarılı | Tarih ve hükümdarı kısa liste dışında bulma; tek kanıtta güvenli ret |
 | Depolama ve geçiş | Başarılı | SQLite şema geçişi, rollback, yedek hatası ve Qdrant yetki filtresi |
 | Depo güvenliği | Başarılı | İzinli yollar, büyük dosya/secret biçimleri, indeks ve başlatıcı kontrolleri |
-| Arayüz mantığı | 17/17 | Genel kapsam, filtre, ajan, hafıza, gecikmiş yanıt ve kaynak gösterimi |
+| Arayüz mantığı | 19/19 | Modern tasarım sistemi, karakter sayacı, genel kapsam, filtre, ajan, hafıza, gecikmiş yanıt ve kaynak gösterimi |
 
 ## Gerçek model kabul aracı
 
@@ -46,6 +48,6 @@ Kısa metin eşleşmesi semantik doğruluk veya doğruluk olasılığı değildi
 ## Sınırlar
 
 - CI, deterministik model test çifti kullanır; gerçek Qwen yanıt kalitesini kanıtlamaz.
-- Arayüz kontrolleri DOM mantık testidir; görsel tarayıcı ve mobil uyumluluk testi değildir.
+- Arayüz kontrolleri DOM mantık testidir; duyarlı CSS ve azaltılmış hareket kuralları doğrulanır ancak gerçek tarayıcıdaki piksel düzeyi görünümün yerini tutmaz.
 - SQL Server/ODBC, Docker GPU ve OCR üretim senaryoları bu koşuda çalıştırılmadı.
 - Kişisel PDF'ler, veritabanı, Qdrant verisi ve yerel değerlendirme çıktıları GitHub'a gönderilmez.

@@ -1,10 +1,4 @@
-.composer-actions .scope-label { flex: 1 1 180px; min-width: 0; }
-.composer-actions .mode-label { min-width: 0; }
-.scope-label select { width: 100%; }
-.question-form .scope-hint { margin: 12px 0 0; }
-.question-form .method-hint { margin: 4px 0 0; }
-.answer-scope { font-size: .75rem; color: var(--muted); margin: 5px 0 12px; }
-.source-card .source-subject { color: var(--blue-dark); font-size: .8rem; font-weight: 650; margin: 0 0 7px; }
-@media (max-width: 700px) {
-  .composer-actions .mode-label { flex: 1 1 160px; }
-}
+/* Sohbet kapsamı ve kaynak metadatası ana tasarım sisteminden ayrılmadan kalır. */
+.answer-scope { font-variant-numeric: tabular-nums; }
+.source-card .source-subject { vertical-align: middle; }
+.question-form .scope-hint, .question-form .method-hint { margin-top: 6px; }
