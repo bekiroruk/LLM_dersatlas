@@ -69,18 +69,22 @@ function showLogin() {
 function suggestionButton([question, letter, title, detail, tone]) {
   const button = node('button'); button.dataset.question = question;
   const icon = node('span', letter, 'suggestion-icon ' + tone);
-  const copy = node('span'); copy.append(node('strong', title), node('small', detail));
-  button.append(icon, copy, node('i', '→'));
+  const top = node('span', undefined, 'suggestion-top'); top.append(icon, node('i', '↗'));
+  button.append(top, node('strong', title), node('small', detail));
   button.addEventListener('click', () => { $('question').value = question; updateQuestionComposer(); $('question').focus(); });
   return button;
 }
 function renderWelcome() {
   const welcome = node('div', undefined, 'welcome');
-  const orb = node('div', undefined, 'welcome-orb'); orb.setAttribute('aria-hidden', 'true'); orb.append(node('span', '✦'));
-  const heading = node('h3'); heading.append(node('span', 'Bugün hangi konuyu'), document.createElement('br'), node('em', 'netleştirelim?'));
+  const glow = node('div', undefined, 'welcome-glow'); glow.setAttribute('aria-hidden', 'true'); glow.append(node('span', '✦'));
+  const copy = node('div', undefined, 'welcome-copy');
+  const badge = node('span', undefined, 'welcome-badge'); badge.append(node('i'), node('span', 'HAZIR · TÜM DERSLER'));
+  const heading = node('h3'); heading.append(node('span', 'Bugün neyi'), document.createElement('br'), node('em', 'birlikte çözelim?'));
   const description = node('p'); description.id = 'welcome-text';
+  copy.append(badge, heading, description);
+  const label = node('div', undefined, 'suggestion-label'); label.append(node('span', 'ÖNERİLEN BAŞLANGIÇLAR'), node('i'));
   const suggestions = node('div', undefined, 'suggestions'); suggestions.append(...promptSuggestions.map(suggestionButton));
-  welcome.append(orb, node('span', '01 / KEŞFET', 'section-number'), heading, description, node('div', 'HIZLI BAŞLANGIÇ', 'suggestion-label'), suggestions);
+  welcome.append(glow, copy, label, suggestions);
   return welcome;
 }
 function updateQuestionComposer() {
@@ -133,7 +137,12 @@ function clearChat() {
 }
 function renderSources(sources) {
   $('source-count').textContent = String(sources.length); $('sources').replaceChildren();
-  if (!sources.length) { const empty = node('div', undefined, 'source-empty'); empty.append(node('span', '02 / DOĞRULA', 'section-number'), node('h3', 'Henüz kaynak yok.'), node('p', 'Soru gönderdiğinde bulunan metin bölümlerini burada görebilirsin.')); $('sources').append(empty); return; }
+  if (!sources.length) {
+    const empty = node('div', undefined, 'source-empty');
+    const illustration = node('div', undefined, 'empty-illustration'); illustration.setAttribute('aria-hidden', 'true'); illustration.append(node('span', '⌕'), node('i'));
+    empty.append(illustration, node('span', 'KAYNAK DEFTERİ', 'section-number'), node('h3', 'Sorunun kanıtları burada toplanır.'), node('p', 'Dosya, ders, sayfa ve ilgili metin tek panelde.'));
+    $('sources').append(empty); return;
+  }
   for (const [index, source] of sources.entries()) {
     const card = node('article', undefined, 'source-card');
     card.append(node('span', source.source_id || 'K' + (index + 1), 'source-label'),
@@ -248,7 +257,7 @@ $('subject-select').addEventListener('change', () => { state.subject = $('subjec
 $('search-subject-select').addEventListener('change', () => setSearchSubject($('search-subject-select').value || null));
 $('mode').addEventListener('change', updateChatScope);
 $('clear-chat').addEventListener('click', clearChat);
-document.querySelectorAll('[data-question]').forEach(button => button.addEventListener('click', () => { $('question').value = button.dataset.question; $('question').focus(); }));
+document.querySelectorAll('[data-question]').forEach(button => button.addEventListener('click', () => { $('question').value = button.dataset.question; updateQuestionComposer(); $('question').focus(); }));
 $('question').addEventListener('input', updateQuestionComposer);
 $('question').addEventListener('keydown', event => { if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); submitQuestion(); } });
 $('question-form').addEventListener('submit', submitQuestion);

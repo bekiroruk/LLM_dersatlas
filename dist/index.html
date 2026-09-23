@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="DersAtlas: kendi ders notlarınla, yerel ve kaynak gösteren çalışma asistanı.">
-  <meta name="theme-color" content="#101a35">
+  <meta name="theme-color" content="#080d1b">
   <title>DersAtlas · Yerel çalışma asistanı</title>
   <link rel="stylesheet" href="/assets/app.css">
   <link rel="stylesheet" href="/assets/accessibility.css">
@@ -13,161 +13,99 @@
 </head>
 <body>
   <section id="login-view" class="login-layout">
-    <div class="login-aside">
-      <div class="login-ambient ambient-one"></div>
-      <div class="login-ambient ambient-two"></div>
+    <div class="login-stage">
+      <div class="aurora aurora-a"></div><div class="aurora aurora-b"></div><div class="grid-noise"></div>
       <div class="brand brand-large"><span class="brand-mark">DA</span><span>DersAtlas</span></div>
       <div class="login-hero">
-        <span class="hero-kicker"><i></i> YEREL · GÜVENLİ · KAYNAKLI</span>
-        <h1>Notların, şimdi<br><em>seninle konuşuyor.</em></h1>
-        <p>Derslerini tek çalışma alanında buluştur. Her cevabı, dayandığı kaynakla birlikte incele.</p>
-        <div class="login-features" aria-label="DersAtlas özellikleri">
-          <div><span>01</span><strong>Tüm derslerde ara</strong><small>Tek sohbetten bütün hazır notlarına ulaş.</small></div>
-          <div><span>02</span><strong>Kaynağı doğrula</strong><small>Dosya, sayfa ve ilgili metni yanında gör.</small></div>
-          <div><span>03</span><strong>Yerelde çalış</strong><small>Modeller ve ders verileri kendi sisteminde kalır.</small></div>
+        <span class="hero-kicker"><i></i> YEREL YAPAY ZEKÂ ÇALIŞMA ALANI</span>
+        <h1>Notlarınla düşün.<br><em>Kaynaklarla ilerle.</em></h1>
+        <p>Derslerini tek bir akıllı çalışma alanında buluştur. Her yanıtın dayanağını aynı ekranda incele.</p>
+        <div class="login-preview" aria-hidden="true">
+          <div class="preview-orb">✦</div><div><span>Kaynaklı çalışma</span><strong>Karadeniz ikliminin bitki örtüsü nedir?</strong><p>Nemli ormanlardır. <b>[K1]</b></p></div>
+          <div class="preview-source"><small>K1 · Coğrafya</small><strong>Türkiye Su, Toprak ve Bitki</strong></div>
         </div>
       </div>
-      <p class="login-foot"><span class="status-dot"></span> Yerel modeller · Ders bazlı erişim · Kaynaklı cevaplar</p>
+      <div class="login-trust"><span><i></i> Modeller hazır</span><span>Veriler cihazında</span><span>Kaynak kontrollü</span></div>
     </div>
     <div class="login-content">
       <form id="login-form" class="login-form">
-        <div class="login-form-head">
-          <span class="form-icon" aria-hidden="true">↗</span>
-          <div><p class="eyebrow">ÇALIŞMA ALANIN</p><h2>Tekrar hoş geldin.</h2></div>
-        </div>
-        <p class="form-intro">Yerel kurulumda oluşturduğun hesabınla devam et.</p>
-        <label for="username">Kullanıcı adı</label>
-        <div class="input-shell"><span aria-hidden="true">@</span><input id="username" name="username" autocomplete="username" required minlength="3" maxlength="60" placeholder="bekir"></div>
-        <label for="password">Parola</label>
-        <div class="input-shell"><span aria-hidden="true">••</span><input id="password" name="password" type="password" autocomplete="current-password" required maxlength="256" placeholder="Parolanı gir"></div>
+        <div class="login-form-head"><span class="form-icon" aria-hidden="true">✦</span><div><p class="eyebrow">DERSATLAS'A GİRİŞ</p><h2>Tekrar hoş geldin</h2></div></div>
+        <p class="form-intro">Kişisel çalışma alanına devam et.</p>
+        <label for="username">Kullanıcı adı</label><div class="input-shell"><span aria-hidden="true">@</span><input id="username" name="username" autocomplete="username" required minlength="3" maxlength="60" placeholder="bekir"></div>
+        <label for="password">Parola</label><div class="input-shell"><span aria-hidden="true">••</span><input id="password" name="password" type="password" autocomplete="current-password" required maxlength="256" placeholder="Parolanı gir"></div>
         <p id="login-error" class="error" role="alert"></p>
-        <button type="submit" class="primary primary-wide">Çalışma alanını aç <span aria-hidden="true">→</span></button>
-        <p class="helper login-helper">İlk hesap henüz yoksa kurulum rehberindeki <code>create-user</code> adımını tamamla. Hazır veya ortak parola bulunmaz.</p>
+        <button type="submit" class="primary primary-wide"><span>Çalışma alanını aç</span><span aria-hidden="true">→</span></button>
+        <p class="helper login-helper">Tüm işlemler kendi yerel sunucunda gerçekleşir.</p>
       </form>
     </div>
   </section>
 
   <div id="app-view" class="app-layout" hidden>
+    <div class="app-ambient ambient-left"></div><div class="app-ambient ambient-right"></div>
     <aside class="sidebar">
-      <div class="sidebar-top">
-        <div class="brand"><span class="brand-mark">DA</span><span>DersAtlas</span></div>
-        <span class="edition-label">LOCAL AI</span>
-      </div>
-      <div class="sidebar-section">
-        <p class="sidebar-label">AKTİF DERS</p>
-        <div class="course-choice">
-          <span class="course-icon" aria-hidden="true">◇</span>
-          <label class="sr-only" for="subject-select">Dokümanları düzenlenecek ders</label>
-          <select id="subject-select"></select>
-          <button id="add-subject" class="icon-button" title="Ders ekle" aria-label="Ders ekle">+</button>
-        </div>
-      </div>
+      <div class="sidebar-top"><div class="brand"><span class="brand-mark">DA</span><span>DersAtlas</span></div><span class="edition-label"><i></i> LOCAL AI</span></div>
+      <div class="sidebar-section"><p class="sidebar-label">ÇALIŞMA DERSİ</p><div class="course-choice"><span class="course-icon" aria-hidden="true">◇</span><label class="sr-only" for="subject-select">Dokümanları düzenlenecek ders</label><select id="subject-select"></select><button id="add-subject" class="icon-button" title="Ders ekle" aria-label="Ders ekle">+</button></div></div>
       <nav aria-label="Ana gezinme">
-        <button class="nav-item active" data-view="study" aria-current="page"><span class="nav-icon" aria-hidden="true">✦</span><span>Genel Sohbet</span><i aria-hidden="true">›</i></button>
-        <button class="nav-item" data-view="documents"><span class="nav-icon" aria-hidden="true">▤</span><span>Dokümanlar</span><i aria-hidden="true">›</i></button>
-        <button class="nav-item" data-view="system"><span class="nav-icon" aria-hidden="true">◫</span><span>Sistem ve ölçümler</span><i aria-hidden="true">›</i></button>
+        <button class="nav-item active" data-view="study" aria-current="page"><span class="nav-icon" aria-hidden="true">✦</span><span class="nav-copy"><strong>Sohbet</strong><small>Notlarına sor</small></span><i aria-hidden="true">›</i></button>
+        <button class="nav-item" data-view="documents"><span class="nav-icon" aria-hidden="true">▤</span><span class="nav-copy"><strong>Dokümanlar</strong><small>Kaynaklarını yönet</small></span><i aria-hidden="true">›</i></button>
+        <button class="nav-item" data-view="system"><span class="nav-icon" aria-hidden="true">◫</span><span class="nav-copy"><strong>Sistem</strong><small>Model ve ölçümler</small></span><i aria-hidden="true">›</i></button>
       </nav>
-      <div class="sidebar-note">
-        <div class="principle-icon" aria-hidden="true">“</div>
-        <span class="small-label">ÇALIŞMA İLKESİ</span>
-        <p>Önce kaynak.<br>Sonra cevap.</p>
-        <small>Kaynak göstermek tek başına doğruluk garantisi değildir; ilgili metni mutlaka kontrol et.</small>
-      </div>
-      <div class="account">
-        <span class="avatar" id="user-avatar">B</span>
-        <div><strong id="user-name">Kullanıcı</strong><small id="user-role">Yerel hesap</small></div>
-        <button id="logout" class="icon-button logout-button" title="Çıkış yap" aria-label="Çıkış yap">↪</button>
-      </div>
+      <div class="sidebar-insight"><span class="insight-mark">✦</span><p>Her cevap yeniden aranır ve kaynağıyla doğrulanır.</p><span>Önce kaynak, sonra cevap.</span></div>
+      <div class="account"><span class="avatar" id="user-avatar">B</span><div><strong id="user-name">Kullanıcı</strong><small id="user-role">Yerel hesap</small></div><button id="logout" class="icon-button logout-button" title="Çıkış yap" aria-label="Çıkış yap">↗</button></div>
     </aside>
 
     <main class="main">
-      <header class="topbar">
-        <div class="page-heading"><p class="eyebrow" id="page-eyebrow">NOTLARINLA SOHBET</p><h1 id="page-title">Genel Sohbet</h1></div>
-        <div class="topbar-actions">
-          <span class="privacy-chip"><i></i> Veriler yerelde</span>
-          <button id="model-badge" class="status-pill" title="Sistem durumunu aç">Model ve RAG sürümü kontrol ediliyor</button>
-        </div>
-      </header>
+      <header class="topbar"><div class="page-heading"><p class="eyebrow" id="page-eyebrow">NOTLARINLA SOHBET</p><h1 id="page-title">Genel Sohbet</h1></div><div class="topbar-actions"><span class="privacy-chip"><i></i><span>Yerel ve özel</span></span><button id="model-badge" class="status-pill" title="Sistem durumunu aç">Model ve RAG sürümü kontrol ediliyor</button></div></header>
 
       <section id="study-view" class="view">
         <div class="workspace-grid">
           <section class="study-panel">
-            <div class="panel-heading">
-              <div><span class="panel-kicker">AI ÇALIŞMA ALANI</span><h2>Notlarınla sohbet et</h2><p>Ders seçmek zorunda değilsin. Yanıtı kaynaklarıyla birlikte oku.</p></div>
-              <button id="clear-chat" class="text-button"><span aria-hidden="true">↻</span> Sohbeti temizle</button>
-            </div>
+            <div class="panel-heading chat-heading"><div class="chat-title"><span class="ai-avatar" aria-hidden="true">✦</span><div><h2>DersAtlas AI</h2><p>Notların açık, kaynakların hazır.</p></div></div><button id="clear-chat" class="text-button"><span aria-hidden="true">↻</span><span>Sohbeti temizle</span></button></div>
             <div id="messages" class="messages" aria-live="polite">
               <div class="welcome">
-                <div class="welcome-orb" aria-hidden="true"><span>✦</span></div>
-                <span class="section-number">01 / KEŞFET</span>
-                <h3>Bugün hangi konuyu<br><em>netleştirelim?</em></h3>
-                <p id="welcome-text">Erişebildiğin bütün derslerin hazır notlarında arama yapabilirsin.</p>
-                <div class="suggestion-label">HIZLI BAŞLANGIÇ</div>
+                <div class="welcome-glow" aria-hidden="true"><span>✦</span></div>
+                <div class="welcome-copy"><span class="welcome-badge"><i></i> HAZIR · TÜM DERSLER</span><h3>Bugün neyi<br><em>birlikte çözelim?</em></h3><p id="welcome-text">Erişebildiğin bütün derslerin hazır notlarında arama yapabilirsin.</p></div>
+                <div class="suggestion-label"><span>ÖNERİLEN BAŞLANGIÇLAR</span><i></i></div>
                 <div class="suggestions">
-                  <button data-question="Tanzimat ve Islahat fermanlarının farkları nelerdir?"><span class="suggestion-icon history-icon">T</span><span><strong>Tarih</strong><small>Fermanları karşılaştır</small></span><i>→</i></button>
-                  <button data-question="Türkiye'deki iklim tiplerinin temel özellikleri nelerdir?"><span class="suggestion-icon geography-icon">C</span><span><strong>Coğrafya</strong><small>İklim tiplerini incele</small></span><i>→</i></button>
-                  <button data-question="Notlarıma göre yasama, yürütme ve yargı görevleri nelerdir?"><span class="suggestion-icon civics-icon">V</span><span><strong>Vatandaşlık</strong><small>Kuvvetleri öğren</small></span><i>→</i></button>
+                  <button data-question="Tanzimat ve Islahat fermanlarının farkları nelerdir?"><span class="suggestion-top"><span class="suggestion-icon history-icon">T</span><i>↗</i></span><strong>Tarih</strong><small>Tanzimat ve Islahat fermanlarını karşılaştır</small></button>
+                  <button data-question="Türkiye'deki iklim tiplerinin temel özellikleri nelerdir?"><span class="suggestion-top"><span class="suggestion-icon geography-icon">C</span><i>↗</i></span><strong>Coğrafya</strong><small>Türkiye'nin iklim tiplerini incele</small></button>
+                  <button data-question="Notlarıma göre yasama, yürütme ve yargı görevleri nelerdir?"><span class="suggestion-top"><span class="suggestion-icon civics-icon">V</span><i>↗</i></span><strong>Vatandaşlık</strong><small>Devletin temel kuvvetlerini öğren</small></button>
                 </div>
               </div>
             </div>
             <form id="question-form" class="question-form">
               <div class="composer-shell">
-                <label for="question" class="sr-only">Notlarına soracağın soru</label>
-                <textarea id="question" rows="2" required minlength="3" maxlength="1200" placeholder="Notlarına bir soru sor..."></textarea>
-                <div class="composer-meta"><span id="question-counter">0 / 1200</span><span class="keyboard-hint"><kbd>Ctrl</kbd> + <kbd>Enter</kbd></span></div>
+                <label for="question" class="sr-only">Notlarına soracağın soru</label><textarea id="question" rows="2" required minlength="3" maxlength="1200" placeholder="Notlarına istediğini sor..."></textarea>
+                <div class="composer-bottom"><div class="composer-selects"><label for="search-subject-select" class="mode-label scope-label"><span class="select-icon">◎</span><select id="search-subject-select" aria-describedby="scope-hint"><option value="">Tüm dersler</option></select></label><span class="composer-divider"></span><label for="mode" class="mode-label"><span class="select-icon">✦</span><select id="mode" aria-describedby="method-hint"><option value="rag">Kaynaklı cevap · RAG</option><option value="agent">Araştırma ajanı · çok adımlı</option></select></label></div><div class="composer-submit"><span id="question-counter">0 / 1200</span><span class="keyboard-hint"><kbd>Ctrl</kbd><b>+</b><kbd>Enter</kbd></span><button id="send" class="primary send-button" type="submit"><span id="send-label">Gönder</span><span class="send-icon" aria-hidden="true">↑</span></button></div></div>
               </div>
-              <div class="composer-actions">
-                <div class="composer-selects">
-                  <label for="search-subject-select" class="mode-label scope-label"><span>Arama kapsamı</span><select id="search-subject-select" aria-describedby="scope-hint"><option value="">Tüm dersler</option></select></label>
-                  <label for="mode" class="mode-label"><span>Yöntem</span><select id="mode" aria-describedby="method-hint"><option value="rag">Kaynaklı cevap · RAG</option><option value="agent">Araştırma ajanı · çok adımlı</option></select></label>
-                </div>
-                <button id="send" class="primary send-button" type="submit"><span id="send-label">Soruyu gönder</span><span class="send-icon" aria-hidden="true">↑</span></button>
-              </div>
-              <details class="composer-help">
-                <summary>Arama kapsamı, yöntem ve gizlilik bilgisi</summary>
-                <p id="scope-hint" class="helper scope-hint"></p>
-                <p id="method-hint" class="helper method-hint"></p>
-                <p id="memory-hint" class="helper">Sohbet hafızası yalnızca açık sayfada tutulur; yerel sunucuda işlenir, veritabanına kaydedilmez.</p>
-                <p class="helper">Önceki cevaplar kaynak değildir. Her cevap için notlar yeniden aranır. Kaynak yoksa genel bilgiden cevap verilmez.</p>
-              </details>
+              <details class="composer-help"><summary>Arama kapsamı, yöntem ve gizlilik bilgisi</summary><p id="scope-hint" class="helper scope-hint"></p><p id="method-hint" class="helper method-hint"></p><p id="memory-hint" class="helper">Sohbet hafızası yalnızca açık sayfada tutulur.</p><p class="helper">Önceki cevaplar kaynak değildir. Her cevap için notlar yeniden aranır.</p></details>
             </form>
           </section>
 
           <aside class="source-panel">
-            <div class="panel-heading source-heading"><div><span class="panel-kicker">KANIT ALANI</span><h2>Kaynak defteri</h2></div><span id="source-count" class="count">0</span></div>
-            <div id="sources" class="sources">
-              <div class="source-empty"><div class="empty-illustration" aria-hidden="true"><span>⌕</span></div><span class="section-number">02 / DOĞRULA</span><h3>Cevabın dayanağı<br>burada görünecek.</h3><p>Ders, dosya, sayfa ve ilgili metin bölümü tek yerde.</p></div>
-            </div>
-            <div class="source-footer"><span aria-hidden="true">ⓘ</span> Arama puanı, cevabın doğru olma olasılığı değildir.</div>
+            <div class="panel-heading source-heading"><div><span class="panel-kicker">CANLI KANIT</span><h2>Kaynaklar</h2></div><span id="source-count" class="count">0</span></div>
+            <div id="sources" class="sources"><div class="source-empty"><div class="empty-illustration" aria-hidden="true"><span>⌕</span><i></i></div><span class="section-number">KAYNAK DEFTERİ</span><h3>Sorunun kanıtları<br>burada toplanır.</h3><p>Dosya, ders, sayfa ve ilgili metin tek panelde.</p></div></div>
+            <div class="source-footer"><span aria-hidden="true">i</span><p>Arama puanı doğruluk olasılığı değildir. İlgili metni mutlaka kontrol et.</p></div>
           </aside>
         </div>
       </section>
 
       <section id="documents-view" class="view" hidden>
-        <div class="section-toolbar"><div><span class="panel-kicker">BİLGİ TABANIN</span><h2>Ders dokümanların</h2><p>Dosyalarını düzenle; hazır notlar Genel Sohbet’te güvenli biçimde aransın.</p></div><button id="refresh-docs" class="secondary"><span aria-hidden="true">↻</span> Yenile</button></div>
-        <div id="upload-zone" class="upload-zone">
-          <div class="upload-icon" aria-hidden="true">↑</div>
-          <div class="upload-copy"><h3>Notlarını buraya bırak</h3><p>PDF, DOCX, TXT veya Markdown · <span id="upload-limit">20</span> MB / dosya</p><small>Taranmış PDF'lerde önce OCR gerekir. Tablo ve sayfa sırasını yükledikten sonra kontrol et.</small></div>
-          <label class="primary file-button" for="file-input">Dosya seç <span aria-hidden="true">＋</span></label><input id="file-input" class="sr-only" type="file" multiple accept=".pdf,.docx,.txt,.md">
-        </div>
-        <p id="upload-progress" class="upload-progress" role="status"></p>
-        <div class="table-wrap"><table><thead><tr><th>Doküman</th><th>Durum</th><th>Parça</th><th>İşlemler</th></tr></thead><tbody id="document-rows"></tbody></table></div>
-        <p id="doc-empty" class="empty-line">Bu derste henüz doküman yok.</p>
+        <div class="section-toolbar"><div><span class="panel-kicker">BİLGİ TABANIN</span><h2>Ders dokümanların</h2><p>Notlarını yükle, indeksle ve çalışma alanında kullan.</p></div><button id="refresh-docs" class="secondary"><span aria-hidden="true">↻</span> Yenile</button></div>
+        <div id="upload-zone" class="upload-zone"><div class="upload-icon" aria-hidden="true">↑</div><div class="upload-copy"><h3>Dosyalarını buraya bırak</h3><p>PDF, DOCX, TXT veya Markdown · <span id="upload-limit">20</span> MB / dosya</p><small>Taranmış PDF'lerde önce OCR gerekir.</small></div><label class="primary file-button" for="file-input">Dosya seç <span aria-hidden="true">＋</span></label><input id="file-input" class="sr-only" type="file" multiple accept=".pdf,.docx,.txt,.md"></div>
+        <p id="upload-progress" class="upload-progress" role="status"></p><div class="table-wrap"><table><thead><tr><th>Doküman</th><th>Durum</th><th>Parça</th><th>İşlemler</th></tr></thead><tbody id="document-rows"></tbody></table></div><p id="doc-empty" class="empty-line">Bu derste henüz doküman yok.</p>
       </section>
 
       <section id="system-view" class="view" hidden>
         <div class="section-toolbar"><div><span class="panel-kicker">CANLI DURUM</span><h2>Yerel sistemin</h2><p>Model, arama altyapısı ve gerçek sorgu ölçümleri.</p></div><button id="refresh-system" class="secondary"><span aria-hidden="true">↻</span> Durumu kontrol et</button></div>
-        <div id="system-cards" class="system-cards"></div>
-        <div class="metrics-heading"><div><span class="panel-kicker">SON 1000 SORGU</span><h2 class="section-title">Çalışma ölçümleri</h2></div><span class="live-label"><i></i> Canlı ölçüm</span></div>
-        <div id="metric-cards" class="metric-cards"></div>
-        <p class="helper metrics-helper">Başarı oranı otomatik bir doğruluk testi değildir; gerçek notların için ayrıca değerlendirme seti hazırlanmalıdır.</p>
-        <div class="architecture-note"><div class="architecture-icon" aria-hidden="true">⌘</div><div><p class="eyebrow">VERİNİN YOLCULUĞU</p><h3>Dosya <span>→</span> Metin <span>→</span> Parçalar <span>→</span> Arama indeksi</h3><p>Sorunun embedding'i ile ilgili parçalar bulunur ve kelime aramasıyla birleştirilir. Yerel dil modeli yalnızca getirilen kaynaklarla cevap üretir; kaynak kimlikleri sunucuda kontrol edilir.</p><p class="architecture-meta"><strong>Bu sürüm:</strong> Yerel Ollama · Kalıcı Qdrant · İlişkisel veri tabanı</p></div></div>
+        <div id="system-cards" class="system-cards"></div><div class="metrics-heading"><div><span class="panel-kicker">SON 1000 SORGU</span><h2 class="section-title">Çalışma ölçümleri</h2></div><span class="live-label"><i></i> Canlı ölçüm</span></div><div id="metric-cards" class="metric-cards"></div><p class="helper metrics-helper">Başarı oranı otomatik bir doğruluk testi değildir; gerçek notların için ayrıca değerlendirme seti hazırlanmalıdır.</p>
+        <div class="architecture-note"><div class="architecture-icon" aria-hidden="true">⌘</div><div><p class="eyebrow">VERİNİN YOLCULUĞU</p><h3>Dosya <span>→</span> Metin <span>→</span> Parçalar <span>→</span> Arama indeksi</h3><p>Sorunun embedding'i ile ilgili parçalar bulunur ve kelime aramasıyla birleştirilir. Yerel model yalnızca getirilen kaynaklarla cevap üretir.</p><p class="architecture-meta"><strong>Bu sürüm:</strong> Yerel Ollama · Kalıcı Qdrant · İlişkisel veri tabanı</p></div></div>
       </section>
     </main>
   </div>
 
   <div id="toast" class="toast" role="status" hidden></div>
-  <dialog id="subject-dialog"><form id="subject-form"><span class="dialog-icon" aria-hidden="true">＋</span><p class="eyebrow">DERSLERİNİ GENİŞLET</p><h2>Yeni ders oluştur</h2><label for="subject-name">Ders adı</label><input id="subject-name" required minlength="2" maxlength="100" placeholder="Örneğin: Coğrafya"><p class="helper">Yeni dersin hazır dokümanları Genel Sohbet’e dahil olur. İstersen ders filtresiyle ayrı arayabilirsin.</p><div class="dialog-actions"><button type="button" class="secondary" data-close="subject-dialog">Vazgeç</button><button class="primary" type="submit">Dersi oluştur</button></div></form></dialog>
+  <dialog id="subject-dialog"><form id="subject-form"><span class="dialog-icon" aria-hidden="true">＋</span><p class="eyebrow">DERSLERİNİ GENİŞLET</p><h2>Yeni ders oluştur</h2><label for="subject-name">Ders adı</label><input id="subject-name" required minlength="2" maxlength="100" placeholder="Örneğin: Coğrafya"><p class="helper">Yeni dersin hazır dokümanları Genel Sohbet’e dahil olur.</p><div class="dialog-actions"><button type="button" class="secondary" data-close="subject-dialog">Vazgeç</button><button class="primary" type="submit">Dersi oluştur</button></div></form></dialog>
   <dialog id="delete-dialog"><span class="dialog-icon danger-icon" aria-hidden="true">!</span><h2>Dokümanı sil?</h2><p id="delete-description"></p><p>Orijinal dosya ve arama parçaları kalıcı olarak silinir. Bu işlem için uygulama içi geri alma yoktur.</p><div class="dialog-actions"><button class="secondary" data-close="delete-dialog">Vazgeç</button><button id="confirm-delete" class="danger">Kalıcı olarak sil</button></div></dialog>
 </body>
 </html>

@@ -6,9 +6,9 @@ Yalnızca gerçekten yapılan değişiklikler kaydedilir. Planlanan özellikler 
 
 ### Modern çalışma alanı — 2026-09-23
 
-- Giriş, sohbet, kaynak defteri, doküman yönetimi ve sistem ekranları ortak bir görsel sistemle yenilendi; yerel çalışma ve kaynak güveni arayüzde daha görünür hâle getirildi.
-- Soru alanına canlı karakter sayacı, otomatik yükseklik, `Ctrl/⌘ + Enter` kısayolu, işlem durumu ve örnek soru kartları eklendi. Kaynak sayısı ve cevap sonucu mesaj düzeyinde daha açık gösterilir.
-- Masaüstü, tablet ve telefon yerleşimleri; klavye odağı, azaltılmış hareket tercihi ve çevrimdışı kullanım korunarak iyileştirildi. Harici yazı tipi veya arayüz servisi eklenmedi.
+- Kullanıcının gerçek masaüstü ekranındaki taşma ve boşluk sorunları üzerinden giriş, sohbet, kaynak defteri, doküman yönetimi ve sistem ekranları ikinci kez tasarlandı; uygulama kabuğu, kart hiyerarşisi ve tipografi baştan kuruldu.
+- Sohbet artık merkezdedir: kırılmayan iki satırlı menü, animasyonlu karşılama alanı, bağımsız öneri kartları, komut çubuğu biçiminde soru alanı ve canlı kanıt paneli kullanılır.
+- Canlı karakter sayacı, otomatik yükseklik, `Ctrl/⌘ + Enter`, işlem durumu, hover/geçiş animasyonları ve kaynak sayısı eklendi. Masaüstü, tablet, telefon, klavye odağı ve azaltılmış hareket tercihi desteklenir; harici arayüz servisi eklenmedi.
 - 211 Python testi, 19 JavaScript arayüz mantığı testi, JavaScript sözdizimi ve Git fark kontrolü başarılıdır.
 
 ### Fetih sorusunda eksik kanıt tamamlama — 2026-09-23

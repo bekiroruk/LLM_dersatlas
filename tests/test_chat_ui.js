@@ -87,9 +87,11 @@ async function main() {
   check('Modern tasarım sistemi erişilebilir ve uyarlanabilir yapı taşlarını içerir', () => {
     assert.ok(html.includes('name="theme-color"'));
     assert.ok(html.includes('id="question-counter"'));
-    assert.ok(styles.includes('@media (max-width: 720px)'));
+    assert.ok(styles.includes('@media (max-width: 760px)'));
     assert.ok(styles.includes('@media (prefers-reduced-motion: reduce)'));
     assert.ok(styles.includes('--shadow-md:'));
+    assert.ok(styles.includes('@keyframes float'));
+    assert.ok(html.includes('class="suggestion-top"'));
   });
   get('question').value = 'Kısa soru';
   get('question').events.input();
