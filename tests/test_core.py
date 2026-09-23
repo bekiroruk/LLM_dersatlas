@@ -20,6 +20,8 @@ from app.rag import (
     _is_question_catalog,
     _comparison_search_queries,
     _sources_are_relevant,
+    _generic_comparison_evidence,
+    _answer_has_source_support,
 )
 from pypdf import PdfWriter
 from docx import Document as WordDocument
@@ -108,6 +110,71 @@ class CoreTests(unittest.TestCase):
         }
         self.assertTrue(_sources_are_relevant(question, [tanzimat, islahat]))
         self.assertFalse(_sources_are_relevant(question, [tanzimat]))
+
+    def test_generic_comparison_prefers_exclusive_pages_over_shared_summary(self):
+        question = "Tanzimat ve Islahat fermanlarının farkları nelerdir?"
+        shared = {
+            "chunk_id": "shared",
+            "text": (
+                "Tanzimat Fermanı'nda Mustafa Reşit Paşa etkilidir. "
+                "Islahat Fermanı'nda Âli ve Fuat Paşalar etkilidir."
+            ),
+        }
+        tanzimat = {
+            "chunk_id": "tanzimat",
+            "text": (
+                "Tanzimat Fermanı 3 Kasım 1839 tarihinde ilan edildi. "
+                "Can, mal ve namus güvenliğini düzenledi."
+            ),
+        }
+        islahat = {
+            "chunk_id": "islahat",
+            "text": (
+                "Islahat Fermanı 1856 yılında ilan edildi. "
+                "Gayrimüslim tebaanın haklarını genişletti."
+            ),
+        }
+        sides = _generic_comparison_evidence(
+            question,
+            [shared, tanzimat, islahat],
+            per_side=1,
+        )
+        self.assertEqual(
+            [side[0][0]["chunk_id"] for side in sides],
+            ["tanzimat", "islahat"],
+        )
+
+    def test_generic_comparison_combines_claims_only_from_selected_side_sources(self):
+        question = "Tanzimat ve Islahat fermanlarının farkları nelerdir?"
+        sources = [
+            {
+                "text": (
+                    "Tanzimat Fermanı 3 Kasım 1839 tarihinde ilan edildi. "
+                    "Can, mal ve namus güvenliğini düzenledi."
+                ),
+            },
+            {
+                "text": (
+                    "Islahat Fermanı 1856 yılında ilan edildi. "
+                    "Gayrimüslim tebaanın haklarını genişletti."
+                ),
+            },
+        ]
+        grounded = (
+            "Tanzimat Fermanı 1839 yılında ilan edilip can, mal ve namus "
+            "güvenliğini düzenlerken Islahat Fermanı 1856 yılında ilan "
+            "edilmiş ve gayrimüslim tebaanın haklarını genişletmiştir."
+        )
+        self.assertTrue(
+            _answer_has_source_support(grounded, question, sources)
+        )
+        self.assertFalse(
+            _answer_has_source_support(
+                grounded.replace("1856", "1908"),
+                question,
+                sources,
+            )
+        )
 
     def test_mixed_comparison_adds_dedicated_rainfall_searches(self):
         question = (

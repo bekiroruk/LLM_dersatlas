@@ -17,7 +17,7 @@ from .ranking import bm25, reciprocal_rank_fusion
 from .security import search_subject_ids
 
 
-RAG_REVISION = "2026-09-24-balanced-comparison-v18"
+RAG_REVISION = "2026-09-24-balanced-comparison-v19"
 
 
 NO_EVIDENCE = (
@@ -1352,12 +1352,18 @@ def _generic_comparison_evidence(question, sources, per_side=2):
     if len(queries) != 2 or _vegetation_subjects(question):
         return []
 
+    query_anchors = [_question_anchors(query) for query in queries]
+    if any(not anchors for anchors in query_anchors):
+        return []
+
     sides = []
-    for query in queries:
-        anchors = _question_anchors(query)
-        if not anchors:
-            return []
+    for side_index, anchors in enumerate(query_anchors):
         required = min(2, len(anchors))
+        opposite_primaries = {
+            other[0]
+            for index, other in enumerate(query_anchors)
+            if index != side_index and other
+        }
         candidates = []
         for source_index, source in enumerate(sources):
             if _is_question_catalog(source.get("text", "")):
@@ -1386,7 +1392,14 @@ def _generic_comparison_evidence(question, sources, per_side=2):
                     r"neden\w*|sonuc\w*)\b",
                     _normalize_text(unit),
                 )))
+                exclusive = int(not any(
+                    _term_in_tokens(term, unit_tokens)
+                    for term in opposite_primaries
+                ))
                 score = (
+                    # Ayrı konu sayfası varsa iki konuyu aynı genel tekrar
+                    # paragrafından kopyalamak yerine onu tercih et.
+                    exclusive,
                     matched,
                     declarative,
                     int(_has_date_value(unit)),
@@ -2009,24 +2022,27 @@ def _direct_evidence_result(answer, selected_sources, all_sources, trace):
 
 def _generic_comparison_excerpt_result(question, sources, trace):
     """Model çekimser kaldığında iki tarafın kesin kaynak satırlarını gösterir."""
-    sides = _generic_comparison_evidence(question, sources, per_side=1)
+    sides = _generic_comparison_evidence(question, sources, per_side=2)
     if len(sides) != 2:
         return None
 
     rows = []
     selected = []
     seen_rows = set()
-    for side in sides:
-        source, unit = side[0]
-        clean = _strip_citations(unit).strip()
-        row_key = (source["source_id"], _normalize_text(clean))
-        if row_key not in seen_rows:
-            rows.append(f"• {clean} [{source['source_id']}]")
-            seen_rows.add(row_key)
-        if source["source_id"] not in {
-            item["source_id"] for item in selected
-        }:
-            selected.append(source)
+    for rank in range(max(len(side) for side in sides)):
+        for side in sides:
+            if rank >= len(side):
+                continue
+            source, unit = side[rank]
+            clean = _strip_citations(unit).strip()
+            row_key = (source["source_id"], _normalize_text(clean))
+            if row_key not in seen_rows:
+                rows.append(f"• {clean} [{source['source_id']}]")
+                seen_rows.add(row_key)
+            if source["source_id"] not in {
+                item["source_id"] for item in selected
+            }:
+                selected.append(source)
 
     if not rows:
         return None
@@ -2687,6 +2703,58 @@ def _roman_name_claims_supported(answer, source_texts):
     return True
 
 
+def _generic_comparison_claim_supported(unit, question, source_texts):
+    """İki tarafı tek cümlede birleştiren iddiayı taraf başına doğrular."""
+    queries = _comparison_search_queries(question)
+    if len(queries) != 2 or _vegetation_subjects(question):
+        return False
+    anchors = [_question_anchors(query) for query in queries]
+    if any(not item for item in anchors):
+        return False
+
+    normalized = _normalize_text(unit)
+    mentions = []
+    for side_index, side_anchors in enumerate(anchors):
+        match = re.search(
+            r"\b" + re.escape(side_anchors[0]) + r"\w*\b",
+            normalized,
+        )
+        if not match:
+            return False
+        mentions.append((match.start(), match.end(), side_index))
+    mentions.sort()
+
+    for position, (_, end, side_index) in enumerate(mentions):
+        next_start = (
+            mentions[position + 1][0]
+            if position + 1 < len(mentions)
+            else len(normalized)
+        )
+        start = mentions[position][0]
+        fragment = normalized[start:next_start]
+        terms = _content_terms(fragment)
+        if not terms:
+            return False
+        required = 1 if len(terms) <= 3 else max(
+            2,
+            math.ceil(len(terms) * 0.25),
+        )
+        side_primary = anchors[side_index][0]
+        side_sources = [
+            text for text in source_texts
+            if _term_in_tokens(side_primary, _tokens(text))
+        ]
+        if not side_sources:
+            return False
+        if max(
+            (_match_count(terms, text) for text in side_sources),
+            default=0,
+        ) < required:
+            return False
+
+    return True
+
+
 def _answer_has_source_support(
     answer,
     question,
@@ -2735,6 +2803,10 @@ def _answer_has_source_support(
         source["text"]
         for source in selected_sources
     ]
+    generic_comparison = (
+        len(_comparison_search_queries(question)) == 2
+        and not subjects
+    )
 
     anchors = _question_anchors(question)
 
@@ -2801,6 +2873,15 @@ def _answer_has_source_support(
         )
 
         if highest_match < required:
+            if (
+                generic_comparison
+                and _generic_comparison_claim_supported(
+                    unit,
+                    question,
+                    source_texts,
+                )
+            ):
+                continue
             return False
 
     return True

@@ -8,7 +8,8 @@ Yalnızca gerçekten yapılan değişiklikler kaydedilir. Planlanan özellikler 
 
 - `Tanzimat ve Islahat fermanlarının farkları` gibi ortak isimli karşılaştırmalar artık iki ayrı kaynak aramasına bölünür; iki konu farklı PDF sayfalarında olsa da ikisi de cevap bağlamına dengeli biçimde alınır.
 - Yerel model açık kaynaklara rağmen çekimser kalırsa iki tarafın doğrulanmış kaynak satırları güvenli karşılaştırma özeti olarak gösterilir. Taraflardan biri gerçekten eksikse kaynak yetersiz sonucu korunur.
-- Bildirilen Tanzimat–Islahat sorusu ayrı belgeler, çekimser model ve konu dışı kaynakla uçtan uca regresyon testine dönüştürüldü. 216 Python testi, 19 JavaScript arayüz mantığı testi ve sözdizimi kontrolleri başarılıdır.
+- Aynı genel tekrar paragrafı iki taraf için tekrar kullanılmaz: varsa Tanzimat ve Islahat'a özel sayfalar önce seçilir. İki ayrı sayfadaki destekli bilgiler tek karşılaştırma cümlesinde güvenle birleştirilebilir; desteksiz tarih ve ayrıntılar reddedilmeye devam eder.
+- Bildirilen Tanzimat–Islahat sorusu ayrı belgeler, ortak özet, çekimser model ve konu dışı kaynakla uçtan uca regresyon testine dönüştürüldü. 219 Python testi, 19 JavaScript arayüz mantığı testi ve sözdizimi kontrolleri başarılıdır.
 
 ### Modern çalışma alanı — 2026-09-23
 

@@ -62,11 +62,12 @@ akışı, kaynak gösterimi, temizleme ve oturum yalıtımı arayüz testleriyle
 Sürümlü statik dosya adresleri ve `no-store` başlıkları, yeni HTML'in eski CSS/JS
 önbelleğiyle karışmasını engeller.
 
-`balanced-comparison-v18` doğrulamasında 216 Python ve 19 DOM mantık testi
+`balanced-comparison-v19` doğrulamasında 219 Python ve 19 DOM mantık testi
 başarılıdır. Tanzimat–Islahat karşılaştırmasının iki ayrı kaynakta bulunması,
-arama bağlamının iki tarafı dengeli taşıması, yerel modelin çekimser kalması
-durumunda kesin kaynak satırlarının gösterilmesi ve tek taraflı kanıtta güvenli
-ret verilmesi test edildi.
+ortak özet yerine konuya özel sayfaların seçilmesi, iki sayfadaki destekli
+bilgilerin tek cümlede birleştirilmesi, yerel modelin çekimser kalması durumunda
+kesin kaynak satırlarının gösterilmesi ve tek taraflı kanıtta güvenli ret
+verilmesi test edildi.
 
 ## Bilinen sınırlamalar
 

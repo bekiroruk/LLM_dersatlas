@@ -201,6 +201,48 @@ class RagContractTests(unittest.TestCase):
             context = messages[1]["content"]
             self.assertNotIn("genel bir tekrar", context)
 
+    def test_generic_comparison_accepts_grounded_synthesis_across_two_pages(self):
+        question = "Tanzimat ve Islahat fermanlarının farkları nelerdir?"
+        sources = [
+            source(
+                "shared",
+                "Tanzimat Fermanı'nda Mustafa Reşit Paşa etkilidir. "
+                "Islahat Fermanı'nda Âli ve Fuat Paşalar etkilidir.",
+            ),
+            source(
+                "tanzimat",
+                "Tanzimat Fermanı 3 Kasım 1839 tarihinde ilan edildi. "
+                "Can, mal ve namus güvenliğini düzenledi.",
+            ),
+            source(
+                "islahat",
+                "Islahat Fermanı 1856 yılında ilan edildi. "
+                "Gayrimüslim tebaanın haklarını genişletti.",
+            ),
+        ]
+        answer = (
+            "Tanzimat Fermanı 1839 yılında ilan edilip can, mal ve namus "
+            "güvenliğini düzenlerken Islahat Fermanı 1856 yılında ilan "
+            "edilmiş ve gayrimüslim tebaanın haklarını genişletmiştir. "
+            "[K1] [K2]"
+        )
+        result, model = self.run_question(
+            question,
+            sources=sources,
+            responses=[payload(answer, ["K1", "K2"])],
+        )
+
+        self.assertEqual(result["outcome"], "answered")
+        self.assertNotEqual(
+            result.get("answer_method"),
+            "comparison_evidence_excerpt",
+        )
+        self.assertIn("1839", result["answer"])
+        self.assertIn("1856", result["answer"])
+        context = self.context(model)
+        self.assertIn("Tanzimat Fermanı 3 Kasım 1839", context[0]["text"])
+        self.assertIn("Islahat Fermanı 1856", context[1]["text"])
+
     def test_category_lists_are_not_vegetation_evidence(self):
         for catalog in (
             "İklim: Karadeniz, Akdeniz, karasal. Bitki örtüsü: orman, maki, bozkır, çayır.",
