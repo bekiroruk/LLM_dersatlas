@@ -104,6 +104,13 @@ class APITests(unittest.TestCase):
         self.assertEqual(self.client.get('/health').json()['rag_revision'], RAG_REVISION)
         self.assertEqual(self.client.get('/api/system').json()['rag_revision'], RAG_REVISION)
 
+    def test_ui_shell_and_assets_cannot_mix_cached_versions(self):
+        for path in ('/', '/assets/app.css?v=20260924-ui3', '/assets/app.js?v=20260924-ui3'):
+            response = self.client.get(path)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.headers.get('cache-control'), 'no-store')
+            self.assertEqual(response.headers.get('pragma'), 'no-cache')
+
     def test_csrf_header_required(self):
         self.assertEqual(self.client.post('/api/subjects', json={"name": "Coğrafya"}).status_code, 403)
 

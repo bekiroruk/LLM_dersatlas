@@ -92,6 +92,9 @@ async function main() {
     assert.ok(styles.includes('--shadow-md:'));
     assert.ok(styles.includes('@keyframes float'));
     assert.ok(html.includes('class="suggestion-top"'));
+    for (const asset of ['app.css', 'accessibility.css', 'chat.css', 'app.js']) {
+      assert.ok(html.includes(asset + '?v=20260924-ui3'), 'Sürümlü arayüz dosyası: ' + asset);
+    }
   });
   get('question').value = 'Kısa soru';
   get('question').events.input();

@@ -9,7 +9,8 @@ Yalnızca gerçekten yapılan değişiklikler kaydedilir. Planlanan özellikler 
 - Kullanıcının gerçek masaüstü ekranındaki taşma ve boşluk sorunları üzerinden giriş, sohbet, kaynak defteri, doküman yönetimi ve sistem ekranları ikinci kez tasarlandı; uygulama kabuğu, kart hiyerarşisi ve tipografi baştan kuruldu.
 - Sohbet artık merkezdedir: kırılmayan iki satırlı menü, animasyonlu karşılama alanı, bağımsız öneri kartları, komut çubuğu biçiminde soru alanı ve canlı kanıt paneli kullanılır.
 - Canlı karakter sayacı, otomatik yükseklik, `Ctrl/⌘ + Enter`, işlem durumu, hover/geçiş animasyonları ve kaynak sayısı eklendi. Masaüstü, tablet, telefon, klavye odağı ve azaltılmış hareket tercihi desteklenir; harici arayüz servisi eklenmedi.
-- 211 Python testi, 19 JavaScript arayüz mantığı testi, JavaScript sözdizimi ve Git fark kontrolü başarılıdır.
+- HTML ile eski CSS/JavaScript sürümünün tarayıcı önbelleğinde karışması engellendi: arayüz dosyaları sürümlü URL kullanır ve uygulama kabuğu ile statik dosyalar `no-store` döndürür.
+- 212 Python testi, 19 JavaScript arayüz mantığı testi, JavaScript sözdizimi ve Git fark kontrolü başarılıdır.
 
 ### Fetih sorusunda eksik kanıt tamamlama — 2026-09-23
 

@@ -2,7 +2,7 @@
 
 ## Sonuç
 
-Yerel Linux/Python 3.12 ortamında **211 Python testi** ve **19 JavaScript
+Yerel Linux/Python 3.12 ortamında **212 Python testi** ve **19 JavaScript
 arayüz mantığı testi** başarılıdır. Python testlerinde atlama başarı sayılmaz.
 Sözdizimi ve paylaşım kapsamı kontrolleri de geçmiştir.
 
@@ -26,6 +26,7 @@ Son `adaptive-agent-v17` kabulünde hazır kaynaklı uygulama doğruluğu 1,0; p
 | Depolama ve geçiş | Başarılı | SQLite şema geçişi, rollback, yedek hatası ve Qdrant yetki filtresi |
 | Depo güvenliği | Başarılı | İzinli yollar, büyük dosya/secret biçimleri, indeks ve başlatıcı kontrolleri |
 | Arayüz mantığı | 19/19 | Modern tasarım sistemi, karakter sayacı, genel kapsam, filtre, ajan, hafıza, gecikmiş yanıt ve kaynak gösterimi |
+| Arayüz önbellek sözleşmesi | Başarılı | Sürümlü CSS/JS URL'leri; HTML ve statik dosyalarda `no-store` / `no-cache` |
 
 ## Gerçek model kabul aracı
 

@@ -52,12 +52,14 @@ Genel ajan kabul aracı eklendikten sonra 197 Python ve 17 DOM mantık testi ba�
 
 `source-contract-v16` doğrulamasında 203 Python ve 17 DOM mantık testi başarılı. Fetih tarih ve hükümdar parçalarının genel benzerlik sıralayıcıları boş sonuç verse bile birlikte bulunması, yalnızca tarih varsa güvenli ret verilmesi ve başlatıcının boş günlük yerine çıkış tanısı göstermesi test edildi.
 
-`adaptive-agent-v17` ve modern arayüz doğrulamasında 211 Python ve 19 DOM mantık testi
+`adaptive-agent-v17` ve modern arayüz doğrulamasında 212 Python ve 19 DOM mantık testi
 başarılı. Yeterli ilk kanıtta ajan planlaması atlanır; eksik/boş kanıtta güvenli
 arama yolu korunur. Model ve arama adımlarının süreleri arayüzde görünür. Tek
 komutluk `scripts/acceptance.ps1`, doğru sürümü başlatır ve benzersiz adlı yerel
 kabul raporu üretir. Modern görünümün yapı taşları, karakter sayacı, genel sohbet
 akışı, kaynak gösterimi, temizleme ve oturum yalıtımı arayüz testleriyle korunur.
+Sürümlü statik dosya adresleri ve `no-store` başlıkları, yeni HTML'in eski CSS/JS
+önbelleğiyle karışmasını engeller.
 
 ## Bilinen sınırlamalar
 
