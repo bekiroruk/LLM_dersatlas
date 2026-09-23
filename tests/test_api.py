@@ -129,6 +129,46 @@ class APITests(unittest.TestCase):
         self.assertEqual(response.json()["outcome"], "answered")
         self.assertEqual(response.json()["sources"][0]["location"], "Metin blok 1")
 
+    def test_generic_comparison_retrieves_both_documents_and_survives_model_abstention(self):
+        self.ready_in(
+            self.subject,
+            "Tanzimat Fermanı 3 Kasım 1839 tarihinde ilan edildi. "
+            "Can, mal ve namus güvenliğini düzenledi.",
+        )
+        self.ready_in(
+            self.subject,
+            "Islahat Fermanı 1856 yılında ilan edildi. "
+            "Gayrimüslim tebaanın haklarını genişletti.",
+        )
+        abstention = {
+            "role": "assistant",
+            "content": json.dumps({
+                "answer": "",
+                "source_ids": [],
+                "insufficient_evidence": True,
+            }),
+        }
+        with patch.object(self.model, "chat", return_value=abstention):
+            result = self.client.post(
+                "/api/questions",
+                json={
+                    "question": (
+                        "Tanzimat ve Islahat fermanlarının farkları nelerdir?"
+                    ),
+                    "mode": "rag",
+                },
+                headers=self.headers,
+            ).json()
+
+        self.assertEqual(result["outcome"], "answered")
+        self.assertEqual(
+            result["answer_method"],
+            "comparison_evidence_excerpt",
+        )
+        self.assertIn("Tanzimat Fermanı", result["answer"])
+        self.assertIn("Islahat Fermanı", result["answer"])
+        self.assertEqual(len(result["sources"]), 2)
+
     def test_duplicate_document(self):
         self.assertEqual(self.upload().status_code, 202)
         self.assertEqual(self.upload().status_code, 409)

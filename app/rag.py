@@ -17,7 +17,7 @@ from .ranking import bm25, reciprocal_rank_fusion
 from .security import search_subject_ids
 
 
-RAG_REVISION = "2026-09-23-adaptive-agent-v17"
+RAG_REVISION = "2026-09-24-balanced-comparison-v18"
 
 
 NO_EVIDENCE = (
@@ -612,7 +612,32 @@ def _comparison_search_queries(question):
             flags=re.IGNORECASE | re.UNICODE,
         )
         if not match:
-            return []
+            # Aynı yapı yalnızca iklimler için değil, ders notlarındaki
+            # "Tanzimat ve Islahat fermanlarının farkları" veya
+            # "Hint ve Çin medeniyetlerini karşılaştır" gibi ortak isimli
+            # karşılaştırmalar için de geçerlidir. Karşılaştırma/fark
+            # yüklemi yoksa bu geniş kalıbı kullanma; sıradan "A ve B ..."
+            # sorularını yanlışlıkla iki ayrı aramaya bölmeyelim.
+            generic = re.fullmatch(
+                r"(.+?)\s+(?:ve|ile)\s+(.+?)\s+"
+                r"([^\W\d_]+)\s+(.+)",
+                plain,
+                flags=re.IGNORECASE | re.UNICODE,
+            )
+            if not generic:
+                return []
+            left, right, shared_head, request = (
+                part.strip() for part in generic.groups()
+            )
+            if not re.search(
+                r"\b(?:karsilastir\w*|kiyasla\w*|fark\w*)\b",
+                _normalize_text(request),
+            ):
+                return []
+            return [
+                f"{left} {shared_head} {request}",
+                f"{right} {shared_head} {request}",
+            ]
 
     left, right, shared_head, request = (
         part.strip() for part in match.groups()
@@ -1313,6 +1338,137 @@ def _evidence_coverage(question, sources):
     return len(required & covered), len(required)
 
 
+def _generic_comparison_evidence(question, sources, per_side=2):
+    """İki genel karşılaştırma tarafını ayrı kanıt parçalarıyla dengeler.
+
+    Küçük yerel modeller, ilk bağlam satırları tek konuya yığıldığında ikinci
+    konu kaynaklarda bulunsa bile kanıtı yetersiz sayabiliyor. Her taraf için
+    konu + ortak isim geçen en açıklayıcı kısa birimleri bulup dönüşümlü
+    seçmek bu sıralama bağımlılığını kaldırır. Dönüş değeri, her taraf için
+    ``(source, exact_evidence_unit)`` listeleridir; kaynak metni yeniden
+    yazılmaz.
+    """
+    queries = _comparison_search_queries(question)
+    if len(queries) != 2 or _vegetation_subjects(question):
+        return []
+
+    sides = []
+    for query in queries:
+        anchors = _question_anchors(query)
+        if not anchors:
+            return []
+        required = min(2, len(anchors))
+        candidates = []
+        for source_index, source in enumerate(sources):
+            if _is_question_catalog(source.get("text", "")):
+                continue
+            best = None
+            for unit_index, unit in enumerate(
+                _evidence_units(source.get("text", ""))
+            ):
+                if "?" in unit or len(_tokens(unit)) < 4:
+                    continue
+                unit_tokens = _tokens(unit)
+                if not _term_in_tokens(anchors[0], unit_tokens):
+                    continue
+                matched = sum(
+                    _term_in_tokens(term, unit_tokens)
+                    for term in anchors
+                )
+                if matched < required:
+                    continue
+                # Başlık + açıklama penceresini, yalnızca kısa başlıktan
+                # daha yararlı say; ama çok uzun OCR bloklarını öne çıkarma.
+                informative = min(len(_content_terms(unit)), 24)
+                declarative = int(bool(re.search(
+                    r"\b(?:ilan\w*|baslat\w*|veril\w*|duzenle\w*|"
+                    r"amac\w*|hak\w*|surec\w*|donem\w*|"
+                    r"neden\w*|sonuc\w*)\b",
+                    _normalize_text(unit),
+                )))
+                score = (
+                    matched,
+                    declarative,
+                    int(_has_date_value(unit)),
+                    informative,
+                    -abs(len(unit) - 260),
+                    -source_index,
+                    -unit_index,
+                )
+                if best is None or score > best[0]:
+                    best = (score, source, unit)
+            if best is not None:
+                candidates.append(best)
+
+        candidates.sort(key=lambda item: item[0], reverse=True)
+        chosen = []
+        seen_sources = set()
+        for _, source, unit in candidates:
+            key = source.get("chunk_id") or (
+                source.get("document_id"), source.get("location")
+            )
+            if key in seen_sources:
+                continue
+            chosen.append((source, unit))
+            seen_sources.add(key)
+            if len(chosen) >= per_side:
+                break
+        if not chosen:
+            return []
+        sides.append(chosen)
+
+    return sides
+
+
+def _balanced_comparison_context(question, sources):
+    """Genel iki-konulu karşılaştırma için kısa ve dengeli model bağlamı."""
+    sides = _generic_comparison_evidence(question, sources)
+    if len(sides) != 2:
+        return []
+
+    ordered = []
+    seen_units = set()
+    for rank in range(max(len(side) for side in sides)):
+        for side in sides:
+            if rank >= len(side):
+                continue
+            source, unit = side[rank]
+            key = (
+                source.get("chunk_id") or (
+                    source.get("document_id"), source.get("location")
+                ),
+                _normalize_text(unit),
+            )
+            if key in seen_units:
+                continue
+            ordered.append((source, unit))
+            seen_units.add(key)
+
+    # Aynı kaynak parçasından iki taraf için farklı kanıt penceresi seçildiyse
+    # kaynak kartını çoğaltmadan pencereleri birleştir.
+    merged = []
+    positions = {}
+    for source, unit in ordered:
+        source_key = source.get("chunk_id") or (
+            source.get("document_id"), source.get("location")
+        )
+        if source_key not in positions:
+            positions[source_key] = len(merged)
+            merged.append((source, [unit]))
+            continue
+        index = positions[source_key]
+        known = merged[index][1]
+        if _normalize_text(unit) not in {
+            _normalize_text(item) for item in known
+        }:
+            known.append(unit)
+
+    return [
+        (source, "\n".join(units))
+        for source, units in merged
+    ][:4]
+
+
 def _is_comparison_question(question):
     normalized = _normalize_text(question)
     return bool(
@@ -1361,6 +1517,21 @@ def _sources_are_relevant(question, sources):
                 return False
 
         return True
+
+    generic_comparison = (
+        len(_comparison_search_queries(question)) == 2
+        and not vegetation_subjects
+    )
+    if generic_comparison:
+        comparison_sides = _generic_comparison_evidence(
+            question,
+            sources[:10],
+            per_side=1,
+        )
+        # İki tarafın aynı cümlede geçmesi gerekmez. Her biri kendi açık
+        # kaynak biriminde konu + ortak isimle destekleniyorsa karşılaştırma
+        # için kaynak ilgisi vardır.
+        return len(comparison_sides) == 2
 
     if len(anchors) <= 2:
         required = len(anchors)
@@ -1834,6 +2005,39 @@ def _direct_evidence_result(answer, selected_sources, all_sources, trace):
         "answer_method": "structured_evidence",
         "trace": trace,
     }
+
+
+def _generic_comparison_excerpt_result(question, sources, trace):
+    """Model çekimser kaldığında iki tarafın kesin kaynak satırlarını gösterir."""
+    sides = _generic_comparison_evidence(question, sources, per_side=1)
+    if len(sides) != 2:
+        return None
+
+    rows = []
+    selected = []
+    seen_rows = set()
+    for side in sides:
+        source, unit = side[0]
+        clean = _strip_citations(unit).strip()
+        row_key = (source["source_id"], _normalize_text(clean))
+        if row_key not in seen_rows:
+            rows.append(f"• {clean} [{source['source_id']}]")
+            seen_rows.add(row_key)
+        if source["source_id"] not in {
+            item["source_id"] for item in selected
+        }:
+            selected.append(source)
+
+    if not rows:
+        return None
+    answer = (
+        "Kaynaklardaki karşılaştırmaya temel olan bilgiler:\n"
+        + "\n".join(rows)
+    )
+    result = _direct_evidence_result(answer, selected, sources, trace)
+    if result is not None:
+        result["answer_method"] = "comparison_evidence_excerpt"
+    return result
 
 
 def _direct_max_precipitation_result(question, sources, trace):
@@ -3386,6 +3590,13 @@ class RAGService:
         focused = _focused_excerpt_result(question, sources, trace)
         if focused is not None:
             return focused
+        comparison_excerpt = _generic_comparison_excerpt_result(
+            question,
+            sources,
+            trace,
+        )
+        if comparison_excerpt is not None:
+            return comparison_excerpt
         if not _sources_are_relevant(question, sources):
             trace.append({
                 "tool": "fallback_relevance_rejected",
@@ -3621,6 +3832,17 @@ class RAGService:
             (source, source["text"])
             for source in sources
         ]
+
+        balanced_comparison = _balanced_comparison_context(
+            question,
+            sources,
+        )
+        if balanced_comparison:
+            context_sources = balanced_comparison
+            trace.append({
+                "tool": "balanced_comparison_context",
+                "found": len(context_sources),
+            })
 
         vegetation_subjects = _vegetation_subjects(question)
         if vegetation_subjects and not _requested_climate_aspects(question):
@@ -3877,6 +4099,13 @@ class RAGService:
             excerpt = _focused_excerpt_result(question, evidence_sources, trace)
             if excerpt is not None:
                 return excerpt
+            comparison_excerpt = _generic_comparison_excerpt_result(
+                question,
+                evidence_sources,
+                trace,
+            )
+            if comparison_excerpt is not None:
+                return comparison_excerpt
             if _is_comparison_question(question):
                 trace.append({
                     "tool": "comparison_evidence_insufficient",

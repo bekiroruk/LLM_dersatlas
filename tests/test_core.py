@@ -18,6 +18,8 @@ from app.rag import (
     _seasonal_climate_phrase,
     _precipitation_relation_quality,
     _is_question_catalog,
+    _comparison_search_queries,
+    _sources_are_relevant,
 )
 from pypdf import PdfWriter
 from docx import Document as WordDocument
@@ -69,6 +71,43 @@ class CoreTests(unittest.TestCase):
                 "Akdeniz iklimi doğal bitki örtüsü flora bitki varlığı baskın görünüm",
             ],
         )
+
+    def test_generic_shared_head_comparison_splits_both_sides(self):
+        question = "Tanzimat ve Islahat fermanlarının farkları nelerdir?"
+        self.assertEqual(
+            _comparison_search_queries(question),
+            [
+                "Tanzimat fermanlarının farkları nelerdir",
+                "Islahat fermanlarının farkları nelerdir",
+            ],
+        )
+        self.assertEqual(
+            _retrieval_queries(question),
+            [
+                question,
+                "Tanzimat fermanlarının farkları nelerdir",
+                "Islahat fermanlarının farkları nelerdir",
+            ],
+        )
+
+    def test_generic_comparison_accepts_separate_evidence_for_each_side(self):
+        question = "Tanzimat ve Islahat fermanlarının farkları nelerdir?"
+        tanzimat = {
+            "chunk_id": "tanzimat",
+            "text": (
+                "Tanzimat Fermanı 3 Kasım 1839 tarihinde ilan edildi. "
+                "Can, mal ve namus güvenliğini düzenledi."
+            ),
+        }
+        islahat = {
+            "chunk_id": "islahat",
+            "text": (
+                "Islahat Fermanı 1856 yılında ilan edildi. "
+                "Gayrimüslim tebaanın haklarını genişletti."
+            ),
+        }
+        self.assertTrue(_sources_are_relevant(question, [tanzimat, islahat]))
+        self.assertFalse(_sources_are_relevant(question, [tanzimat]))
 
     def test_mixed_comparison_adds_dedicated_rainfall_searches(self):
         question = (

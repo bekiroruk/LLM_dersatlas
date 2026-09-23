@@ -1,8 +1,8 @@
-# Doğrulama raporu — 23 Eylül 2026
+# Doğrulama raporu — 24 Eylül 2026
 
 ## Sonuç
 
-Yerel Linux/Python 3.12 ortamında **212 Python testi** ve **19 JavaScript
+Yerel Linux/Python 3.12 ortamında **216 Python testi** ve **19 JavaScript
 arayüz mantığı testi** başarılıdır. Python testlerinde atlama başarı sayılmaz.
 Sözdizimi ve paylaşım kapsamı kontrolleri de geçmiştir.
 
@@ -23,6 +23,7 @@ Son `adaptive-agent-v17` kabulünde hazır kaynaklı uygulama doğruluğu 1,0; p
 | İklim karşılaştırması regresyonu | Başarılı | Bozuk PDF tablosu, eksik ilişki, kırpılmış hücre ve sınav notu temizliği |
 | Soru kataloğu ve kişi adı regresyonu | Başarılı | Cevapsız soru listesini kanıt saymama; bozuk hükümdar adını reddetme |
 | Fetih olay kanıtı tamamlama | Başarılı | Tarih ve hükümdarı kısa liste dışında bulma; tek kanıtta güvenli ret |
+| Genel karşılaştırma kanıt dengesi | Başarılı | Ortak isimli iki konuyu ayrı arama; ayrı sayfalardaki kanıtları dengeleme; çekimser modelde kaynak satırı; tek taraflı kanıtta güvenli ret |
 | Depolama ve geçiş | Başarılı | SQLite şema geçişi, rollback, yedek hatası ve Qdrant yetki filtresi |
 | Depo güvenliği | Başarılı | İzinli yollar, büyük dosya/secret biçimleri, indeks ve başlatıcı kontrolleri |
 | Arayüz mantığı | 19/19 | Modern tasarım sistemi, karakter sayacı, genel kapsam, filtre, ajan, hafıza, gecikmiş yanıt ve kaynak gösterimi |

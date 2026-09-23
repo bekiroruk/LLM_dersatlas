@@ -152,6 +152,55 @@ class RagContractTests(unittest.TestCase):
         result, _ = self.run_question(COMPARISON, sources=[source("one", "Akdeniz ikliminin doğal bitki örtüsü makidir.")])
         self.assertEqual(result["outcome"], "insufficient")
 
+    def test_generic_comparison_uses_balanced_exact_evidence_when_model_abstains(self):
+        question = "Tanzimat ve Islahat fermanlarının farkları nelerdir?"
+        sources = [
+            source(
+                "tanzimat",
+                "Tanzimat Fermanı 3 Kasım 1839 tarihinde ilan edildi. "
+                "Can, mal ve namus güvenliğini düzenledi.",
+            ),
+            source(
+                "islahat",
+                "Islahat Fermanı 1856 yılında ilan edildi. "
+                "Gayrimüslim tebaanın haklarını genişletti.",
+            ),
+            source(
+                "distractor",
+                "Osmanlı Devleti ile ilgili genel bir tekrar sayfasıdır.",
+            ),
+        ]
+        abstention = {
+            "role": "assistant",
+            "content": json.dumps({
+                "answer": "",
+                "source_ids": [],
+                "insufficient_evidence": True,
+            }),
+        }
+        result, model = self.run_question(
+            question,
+            sources=sources,
+            responses=[abstention],
+        )
+
+        self.assertEqual(result["outcome"], "answered")
+        self.assertEqual(
+            result["answer_method"],
+            "comparison_evidence_excerpt",
+        )
+        self.assertIn("Tanzimat Fermanı", result["answer"])
+        self.assertIn("Islahat Fermanı", result["answer"])
+        self.assertNotIn("genel bir tekrar", result["answer"])
+        self.assertEqual(len(result["sources"]), 2)
+        self.assertTrue(any(
+            item["tool"] == "balanced_comparison_context"
+            for item in result["trace"]
+        ))
+        for messages, _ in model.calls:
+            context = messages[1]["content"]
+            self.assertNotIn("genel bir tekrar", context)
+
     def test_category_lists_are_not_vegetation_evidence(self):
         for catalog in (
             "İklim: Karadeniz, Akdeniz, karasal. Bitki örtüsü: orman, maki, bozkır, çayır.",

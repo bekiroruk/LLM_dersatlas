@@ -27,6 +27,7 @@ Ders materyalleri, yerel ortam ayarları, veritabanı ve vektör indeksleri akta
 - v15 tekrarında kaynak ve cevap kapsaması 0,917'ye, p95 32,9 saniyeye yükseldi. V01 kapandı; T01 ise hükümdar kanıtı kısa listeden düşünce yalnızca tarih ve dağınık PDF satırlarıyla cevaplandı. `source-contract-v16` iki olay kanıtını tüm yetkili parçalarda tamamlar ve eksikse cevap vermeyi reddeder.
 - v17 gerçek Windows raporunda hazır kaynaklı sorularda uygulama doğruluğu 1,0 oldu. Tek uyumsuzluk, notlarda hükümdar ilişkisi bulunmayan T01 için güvenli rettir. İlk ölçümde p50 52,1 ve p95 68,2 saniyeydi; uyarlamalı ajan sonrasında aynı kabul akışı p50 8,9 ve p95 15,0 saniyede tamamlandı.
 - Giriş, sohbet, kaynak defteri, doküman ve sistem ekranları modern ve ortak bir tasarım sistemiyle yenilendi. Soru önerileri, canlı karakter sayacı, klavye kısayolu, işlem durumu, kaynak sayısı ve uyarlanabilir mobil yerleşim eklendi; çevrimdışı çalışma korunuyor.
+- Ortak isimli genel karşılaştırmalar (`Tanzimat ve Islahat fermanları` gibi) iki tarafa ayrılarak aranır. Ayrı sayfalardaki kanıtlar dengeli bağlama alınır; model çekimser kalırsa doğrulanmış kaynak satırları gösterilir, tek taraf eksikse sistem cevap uydurmaz.
 
 ## Doğrulama
 
@@ -61,6 +62,12 @@ akışı, kaynak gösterimi, temizleme ve oturum yalıtımı arayüz testleriyle
 Sürümlü statik dosya adresleri ve `no-store` başlıkları, yeni HTML'in eski CSS/JS
 önbelleğiyle karışmasını engeller.
 
+`balanced-comparison-v18` doğrulamasında 216 Python ve 19 DOM mantık testi
+başarılıdır. Tanzimat–Islahat karşılaştırmasının iki ayrı kaynakta bulunması,
+arama bağlamının iki tarafı dengeli taşıması, yerel modelin çekimser kalması
+durumunda kesin kaynak satırlarının gösterilmesi ve tek taraflı kanıtta güvenli
+ret verilmesi test edildi.
+
 ## Bilinen sınırlamalar
 
 - Hafıza sayfa yenilenince silinir; kalıcı sohbet geçmişi yoktur.
@@ -72,7 +79,6 @@ Sürümlü statik dosya adresleri ve `no-store` başlıkları, yeni HTML'in eski
 
 ## Sıradaki adım
 
-Windows kurulumunda güncel kodu çekip uygulamayı başlatmak; giriş, genel sohbet,
-kaynak defteri, doküman ve sistem ekranlarını gerçek tarayıcıda masaüstü ve dar
-pencere genişliğinde görsel olarak kontrol etmek. Yeni proje ZIP'i, doküman
-yükleme veya yeniden indeksleme gerekli değil.
+Windows kurulumunda güncel kodu çekip uygulamayı başlatmak; bildirilen Tanzimat–
+Islahat karşılaştırmasını gerçek PDF'ler ve yerel Qwen modeliyle yeniden sormak.
+Yeni proje ZIP'i, doküman yükleme veya yeniden indeksleme gerekli değil.

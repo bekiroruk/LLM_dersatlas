@@ -4,6 +4,12 @@ Yalnızca gerçekten yapılan değişiklikler kaydedilir. Planlanan özellikler 
 
 ## Unreleased
 
+### Genel karşılaştırma kanıt dengesi — 2026-09-24
+
+- `Tanzimat ve Islahat fermanlarının farkları` gibi ortak isimli karşılaştırmalar artık iki ayrı kaynak aramasına bölünür; iki konu farklı PDF sayfalarında olsa da ikisi de cevap bağlamına dengeli biçimde alınır.
+- Yerel model açık kaynaklara rağmen çekimser kalırsa iki tarafın doğrulanmış kaynak satırları güvenli karşılaştırma özeti olarak gösterilir. Taraflardan biri gerçekten eksikse kaynak yetersiz sonucu korunur.
+- Bildirilen Tanzimat–Islahat sorusu ayrı belgeler, çekimser model ve konu dışı kaynakla uçtan uca regresyon testine dönüştürüldü. 216 Python testi, 19 JavaScript arayüz mantığı testi ve sözdizimi kontrolleri başarılıdır.
+
 ### Modern çalışma alanı — 2026-09-23
 
 - Kullanıcının gerçek masaüstü ekranındaki taşma ve boşluk sorunları üzerinden giriş, sohbet, kaynak defteri, doküman yönetimi ve sistem ekranları ikinci kez tasarlandı; uygulama kabuğu, kart hiyerarşisi ve tipografi baştan kuruldu.
