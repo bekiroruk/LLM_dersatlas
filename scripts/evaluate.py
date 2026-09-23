@@ -38,7 +38,8 @@ def post_json(client, url, body, retries=3, retry_wait=10, sleep=time.sleep):
             delay = retry_wait * (2 ** attempt)
             print(
                 f"HTTP {exc.code}; {delay:g} saniye sonra yeniden deneniyor "
-                f"({attempt + 1}/{retries})..."
+                f"({attempt + 1}/{retries})...",
+                flush=True,
             )
             sleep(delay)
         except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
@@ -47,7 +48,8 @@ def post_json(client, url, body, retries=3, retry_wait=10, sleep=time.sleep):
             delay = retry_wait * (2 ** attempt)
             print(
                 f"Geçici bağlantı hatası; {delay:g} saniye sonra yeniden "
-                f"deneniyor ({attempt + 1}/{retries})..."
+                f"deneniyor ({attempt + 1}/{retries})...",
+                flush=True,
             )
             sleep(delay)
 
@@ -103,15 +105,18 @@ def save_checkpoint(path, key, results):
     temporary.replace(path)
 
 
-def resolve_password(env_name, environ=None, prompt=None):
+def resolve_password(env_name, environ=None, prompt=None, output=None):
     """Parolayı ortamdan veya görünmez güvenli girişten alır."""
     environ = os.environ if environ is None else environ
     prompt = getpass.getpass if prompt is None else prompt
+    output = print if output is None else output
     password = environ.get(env_name)
     if password is None:
-        password = prompt(
-            "DersAtlas giriş parolası (yazarken ekranda görünmez): "
+        output(
+            "DersAtlas giriş parolası (yazarken ekranda görünmez):",
+            flush=True,
         )
+        password = prompt("")
     if not password:
         raise SystemExit(
             "Parola boş bırakılamaz. Komutu yeniden çalıştır; Parola satırında "
@@ -380,6 +385,11 @@ def main(argv=None):
     ):
         if results:
             time.sleep(max(0, args.delay))
+        identifier = str(item.get("id") or f"Q{index:02d}")
+        print(
+            f"{index}/{len(questions)} {identifier} başlatıldı...",
+            flush=True,
+        )
         started = time.perf_counter()
         body = {"question": item["question"], "mode": args.mode}
         if args.subject_id:
@@ -451,7 +461,10 @@ def main(argv=None):
             })
         results.append(row)
         save_checkpoint(checkpoint, checkpoint_key, results)
-        print(f"{index}/{len(questions)} {row['id']} tamamlandı")
+        print(
+            f"{index}/{len(questions)} {row['id']} tamamlandı",
+            flush=True,
+        )
 
     report = {
         "note": (

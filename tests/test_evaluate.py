@@ -21,14 +21,25 @@ from scripts.evaluate import (
 class EvaluationToolTests(unittest.TestCase):
     def test_password_prompt_explains_hidden_input_and_rejects_blank(self):
         prompts = []
+        outputs = []
 
         def blank_prompt(message):
             prompts.append(message)
             return ""
 
+        def capture_output(message, flush):
+            outputs.append((message, flush))
+
         with self.assertRaisesRegex(SystemExit, "Parola boş bırakılamaz"):
-            resolve_password("DERSATLAS_EVAL_PASSWORD", {}, blank_prompt)
-        self.assertIn("ekranda görünmez", prompts[0])
+            resolve_password(
+                "DERSATLAS_EVAL_PASSWORD",
+                {},
+                blank_prompt,
+                capture_output,
+            )
+        self.assertEqual(prompts, [""])
+        self.assertIn("ekranda görünmez", outputs[0][0])
+        self.assertTrue(outputs[0][1])
 
     def test_password_environment_value_skips_prompt(self):
         self.assertEqual(
