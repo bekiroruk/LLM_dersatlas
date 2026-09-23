@@ -9,6 +9,7 @@ from scripts.evaluate import (
     percentile,
     load_checkpoint,
     post_json,
+    resolve_password,
     save_checkpoint,
     snippet_coverage,
     source_requirement_coverage,
@@ -18,6 +19,27 @@ from scripts.evaluate import (
 
 
 class EvaluationToolTests(unittest.TestCase):
+    def test_password_prompt_explains_hidden_input_and_rejects_blank(self):
+        prompts = []
+
+        def blank_prompt(message):
+            prompts.append(message)
+            return ""
+
+        with self.assertRaisesRegex(SystemExit, "Parola boş bırakılamaz"):
+            resolve_password("DERSATLAS_EVAL_PASSWORD", {}, blank_prompt)
+        self.assertIn("ekranda görünmez", prompts[0])
+
+    def test_password_environment_value_skips_prompt(self):
+        self.assertEqual(
+            resolve_password(
+                "DERSATLAS_EVAL_PASSWORD",
+                {"DERSATLAS_EVAL_PASSWORD": "secret"},
+                lambda _: self.fail("prompt çağrılmamalı"),
+            ),
+            "secret",
+        )
+
     def test_post_json_retries_transient_503(self):
         class Client:
             calls = 0

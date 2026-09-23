@@ -103,6 +103,23 @@ def save_checkpoint(path, key, results):
     temporary.replace(path)
 
 
+def resolve_password(env_name, environ=None, prompt=None):
+    """Parolayı ortamdan veya görünmez güvenli girişten alır."""
+    environ = os.environ if environ is None else environ
+    prompt = getpass.getpass if prompt is None else prompt
+    password = environ.get(env_name)
+    if password is None:
+        password = prompt(
+            "DersAtlas giriş parolası (yazarken ekranda görünmez): "
+        )
+    if not password:
+        raise SystemExit(
+            "Parola boş bırakılamaz. Komutu yeniden çalıştır; Parola satırında "
+            "DersAtlas'a giriş yaparken kullandığın parolayı yazıp Enter'a bas."
+        )
+    return password
+
+
 def percentile(values, percent):
     """Küçük kabul kümeleri için doğrusal enterpolasyonlu yüzdelik."""
     ordered = sorted(values)
@@ -339,11 +356,24 @@ def main(argv=None):
             retries=args.retries,
             retry_wait=args.retry_wait,
         )
-        with client.open(request, timeout=900) as response:
-            return json.load(response)
 
-    password = os.environ.get(args.password_env) or getpass.getpass("Parola: ")
-    post("/api/login", {"username": args.username, "password": password})
+    password = resolve_password(args.password_env)
+    try:
+        post("/api/login", {"username": args.username, "password": password})
+    except urllib.error.HTTPError as exc:
+        if exc.code == 401:
+            message = (
+                f"'{args.username}' kullanıcısının parolası hatalı. Komutu "
+                "yeniden çalıştır ve DersAtlas giriş parolasını yaz."
+            )
+        elif exc.code == 422:
+            message = (
+                "Giriş bilgileri sunucu tarafından geçersiz bulundu. Kullanıcı "
+                "adı ve parolanın boş olmadığını kontrol et."
+            )
+        else:
+            message = f"DersAtlas girişi başarısız: HTTP {exc.code}."
+        raise SystemExit(message) from None
 
     for index, item in enumerate(
         questions[len(results):], start=len(results) + 1
