@@ -2,7 +2,7 @@
 
 ## Sonuç
 
-Yerel Linux/Python 3.12 ortamında **222 Python testi** ve **19 JavaScript
+Yerel Linux/Python 3.12 ortamında **223 Python testi** ve **19 JavaScript
 arayüz mantığı testi** başarılıdır. Python testlerinde atlama başarı sayılmaz.
 Sözdizimi ve paylaşım kapsamı kontrolleri de geçmiştir.
 
@@ -25,6 +25,7 @@ Son `adaptive-agent-v17` kabulünde hazır kaynaklı uygulama doğruluğu 1,0; p
 | Fetih olay kanıtı tamamlama | Başarılı | Tarih ve hükümdarı kısa liste dışında bulma; tek kanıtta güvenli ret |
 | Genel karşılaştırma kanıt dengesi | Başarılı | Ortak isimli iki konuyu ayrı arama; ayrı sayfalardaki kanıtları dengeleme; çekimser modelde kaynak satırı; tek taraflı kanıtta güvenli ret |
 | Dönem–olay ilişkisi ve kaynak meta temizliği | Başarılı | Dönem aralığını fermanın ilan aralığına dönüştürmeme; PDF başlığı, bölüm numarası ve kaynak hakkındaki meta dili cevapta reddetme |
+| Temiz karşılaştırma geri dönüşü | Başarılı | Hatalı model cevabından sonra iki tarafı ayrı başlıklarla sunma; komşu konu, numaralı başlık, çalışma etiketi ve tekrarları ayıklama |
 | Depolama ve geçiş | Başarılı | SQLite şema geçişi, rollback, yedek hatası ve Qdrant yetki filtresi |
 | Depo güvenliği | Başarılı | İzinli yollar, büyük dosya/secret biçimleri, indeks ve başlatıcı kontrolleri |
 | Arayüz mantığı | 19/19 | Modern tasarım sistemi, karakter sayacı, genel kapsam, filtre, ajan, hafıza, gecikmiş yanıt ve kaynak gösterimi |

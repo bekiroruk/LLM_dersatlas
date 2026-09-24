@@ -17,7 +17,7 @@ from .ranking import bm25, reciprocal_rank_fusion
 from .security import search_subject_ids
 
 
-RAG_REVISION = "2026-09-24-relation-guard-v20"
+RAG_REVISION = "2026-09-24-clean-comparison-v21"
 
 
 NO_EVIDENCE = (
@@ -1338,6 +1338,108 @@ def _evidence_coverage(question, sources):
     return len(required & covered), len(required)
 
 
+def _clean_generic_comparison_excerpt(text):
+    """PDF başlıklarını ve çalışma notu etiketlerini kanıt cümlesinden ayırır."""
+    cleaned = str(text or "")
+    uppercase_word = (
+        r"(?:[A-ZÇĞİÖŞÜ0-9][A-ZÇĞİÖŞÜ0-9’'/-]*)"
+        r"(?![a-zçğıöşü])"
+    )
+    # Numaralı ve tamamen büyük harfli başlığı kaldır; aynı satırdaki normal
+    # açıklama metnini koru.
+    cleaned = re.sub(
+        r"\b\d{1,3}[.]\s+"
+        rf"(?:{uppercase_word}[ \t]*){{2,12}}",
+        ". ",
+        cleaned,
+    )
+    # Cümle ayırıcı numarayı daha önce bölmüşse geride yalnızca büyük harfli
+    # bölüm başlığı kalabilir.
+    cleaned = re.sub(
+        rf"(?:^|(?<=[.!?])\s+)(?:{uppercase_word}[ \t]+){{2,12}}"
+        r"(?=[A-ZÇĞİÖŞÜ][a-zçğıöşü])",
+        "",
+        cleaned,
+    )
+    # Bunlar ders içeriği değil, not hazırlama/ezberleme etiketleridir.
+    cleaned = re.sub(
+        r"\b(?:kritik\s+e[şs]le[şs]tirme|tuzak\s*/\s*not)\b\s*:?",
+        ". ",
+        cleaned,
+        flags=re.IGNORECASE,
+    )
+    cleaned = re.sub(r"\s+\d{2,3}[.]?\s*$", "", cleaned)
+    cleaned = re.sub(r"\s*\.\s*\.\s*", ". ", cleaned)
+    cleaned = re.sub(r"\s+[.]\s*", ". ", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip(" .-•\t")
+    return cleaned
+
+
+def _focused_generic_comparison_unit(unit, primary, opposite_primaries=()):
+    """Bir kanıt penceresinden yalnızca ilgili karşılaştırma tarafını alır."""
+    cleaned = _clean_generic_comparison_excerpt(unit)
+    atomic = _source_units(cleaned)
+    if not atomic:
+        return ""
+
+    continuation = re.compile(
+        r"^(?:baslica\s+)?(?:neden\w*|amac\w*|hazirlan\w*|"
+        r"etkili\w*|ilan\w*|tarih\w*|hak\w*|sonuc\w*|"
+        r"getir\w*|duzenle\w*|guvence\w*)\b"
+    )
+    candidates = []
+
+    for index, part in enumerate(atomic):
+        part_tokens = _tokens(part)
+        if not _term_in_tokens(primary, part_tokens):
+            continue
+
+        selected = [part]
+        for following in atomic[index + 1:index + 4]:
+            following_tokens = _tokens(following)
+            if any(
+                _term_in_tokens(opposite, following_tokens)
+                for opposite in opposite_primaries
+            ):
+                break
+            normalized_following = _normalize_text(following)
+            if len(selected) == 1:
+                selected.append(following)
+                continue
+            if not (
+                selected[-1].rstrip().endswith(":")
+                or continuation.search(normalized_following)
+            ):
+                break
+            selected.append(following)
+
+        focused = " ".join(selected).strip()
+        if "→" in focused:
+            left, right = (piece.strip(" .:") for piece in focused.split("→", 1))
+            left_has_topic = _term_in_tokens(primary, _tokens(left))
+            right_has_topic = _term_in_tokens(primary, _tokens(right))
+            if left_has_topic and not right_has_topic:
+                focused = f"{left}: {right}"
+            elif right_has_topic and not left_has_topic:
+                focused = f"{right}: {left}"
+        focused = re.sub(
+            r"\b([a-zçğıöşü]+m[ae]k)\s+([A-ZÇĞİÖŞÜ])",
+            r"\1; \2",
+            focused,
+        )
+        terms = _content_terms(focused)
+        candidates.append((
+            _match_count([primary], focused),
+            -len(terms),
+            -len(focused),
+            focused,
+        ))
+
+    if not candidates:
+        return ""
+    return max(candidates)[-1]
+
+
 def _generic_comparison_evidence(question, sources, per_side=2):
     """İki genel karşılaştırma tarafını ayrı kanıt parçalarıyla dengeler.
 
@@ -1372,9 +1474,14 @@ def _generic_comparison_evidence(question, sources, per_side=2):
             for unit_index, unit in enumerate(
                 _evidence_units(source.get("text", ""))
             ):
-                if "?" in unit or len(_tokens(unit)) < 4:
+                focused_unit = _focused_generic_comparison_unit(
+                    unit,
+                    anchors[0],
+                    opposite_primaries,
+                )
+                if "?" in focused_unit or len(_tokens(focused_unit)) < 4:
                     continue
-                unit_tokens = _tokens(unit)
+                unit_tokens = _tokens(focused_unit)
                 if not _term_in_tokens(anchors[0], unit_tokens):
                     continue
                 matched = sum(
@@ -1385,12 +1492,12 @@ def _generic_comparison_evidence(question, sources, per_side=2):
                     continue
                 # Başlık + açıklama penceresini, yalnızca kısa başlıktan
                 # daha yararlı say; ama çok uzun OCR bloklarını öne çıkarma.
-                informative = min(len(_content_terms(unit)), 24)
+                informative = min(len(_content_terms(focused_unit)), 24)
                 declarative = int(bool(re.search(
                     r"\b(?:ilan\w*|baslat\w*|veril\w*|duzenle\w*|"
-                    r"amac\w*|hak\w*|surec\w*|donem\w*|"
+                    r"amac\w*|hak\w*|etkili\w*|surec\w*|donem\w*|"
                     r"neden\w*|sonuc\w*)\b",
-                    _normalize_text(unit),
+                    _normalize_text(focused_unit),
                 )))
                 exclusive = int(not any(
                     _term_in_tokens(term, unit_tokens)
@@ -1402,14 +1509,14 @@ def _generic_comparison_evidence(question, sources, per_side=2):
                     exclusive,
                     matched,
                     declarative,
-                    int(_has_date_value(unit)),
+                    int(_has_date_value(focused_unit)),
                     informative,
-                    -abs(len(unit) - 260),
+                    -len(focused_unit),
                     -source_index,
                     -unit_index,
                 )
                 if best is None or score > best[0]:
-                    best = (score, source, unit)
+                    best = (score, source, focused_unit)
             if best is not None:
                 candidates.append(best)
 
@@ -2021,35 +2128,77 @@ def _direct_evidence_result(answer, selected_sources, all_sources, trace):
 
 
 def _generic_comparison_excerpt_result(question, sources, trace):
-    """Model çekimser kaldığında iki tarafın kesin kaynak satırlarını gösterir."""
+    """Model başarısızsa iki tarafın temiz ve kesin kaynak maddelerini gösterir."""
     sides = _generic_comparison_evidence(question, sources, per_side=2)
     if len(sides) != 2:
         return None
 
-    rows = []
+    queries = _comparison_search_queries(question)
+    primaries = [_question_anchors(query)[0] for query in queries]
+    question_words = re.findall(
+        r"[^\W\d_][\w’'\-]*",
+        str(question),
+        flags=re.UNICODE,
+    )
+    labels = [
+        next(
+            (
+                word
+                for word in question_words
+                if _same_term(primary, word)
+            ),
+            primary.capitalize(),
+        )
+        for primary in primaries
+    ]
+
+    grouped_rows = []
     selected = []
-    seen_rows = set()
-    for rank in range(max(len(side) for side in sides)):
-        for side in sides:
-            if rank >= len(side):
-                continue
-            source, unit = side[rank]
-            clean = _strip_citations(unit).strip()
-            row_key = (source["source_id"], _normalize_text(clean))
-            if row_key not in seen_rows:
-                rows.append(f"• {clean} [{source['source_id']}]")
+    for side_index, side in enumerate(sides):
+        rows = []
+        seen_rows = set()
+        for source, unit in side:
+            clean = _clean_generic_comparison_excerpt(
+                _strip_citations(unit)
+            )
+            clean = clean.strip(" .-•\t")
+            row_key = _normalize_text(clean)
+            if clean and row_key not in seen_rows:
+                rows.append((source, clean))
                 seen_rows.add(row_key)
+
+        # Aynı kişi/olgu daha kapsamlı ikinci satırda zaten varsa kısa tekrar
+        # yerine kapsamlı kanıtı bir kez göster.
+        compact = []
+        for row_index, (source, clean) in enumerate(rows):
+            terms = _content_terms(clean)
+            redundant = any(
+                other_index != row_index
+                and len(_content_terms(other_clean)) > len(terms)
+                and _match_count(terms, other_clean)
+                >= max(2, math.ceil(len(terms) * 0.70))
+                for other_index, (_, other_clean) in enumerate(rows)
+            )
+            if not redundant:
+                compact.append((source, clean))
+
+        if not compact:
+            return None
+        grouped_rows.append(compact)
+
+    lines = ["Karşılaştırma:"]
+    for label, rows in zip(labels, grouped_rows):
+        lines.append(f"{label}:")
+        for source, clean in rows:
+            lines.append(f"• {clean} [{source['source_id']}]")
             if source["source_id"] not in {
                 item["source_id"] for item in selected
             }:
                 selected.append(source)
 
-    if not rows:
+    if len(lines) <= 1:
         return None
-    answer = (
-        "Kaynaklardaki karşılaştırmaya temel olan bilgiler:\n"
-        + "\n".join(rows)
-    )
+    answer = "\n".join(lines)
     result = _direct_evidence_result(answer, selected, sources, trace)
     if result is not None:
         result["answer_method"] = "comparison_evidence_excerpt"

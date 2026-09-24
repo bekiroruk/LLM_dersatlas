@@ -288,6 +288,75 @@ class RagContractTests(unittest.TestCase):
             for item in result["trace"]
         ))
 
+    def test_reported_comparison_fallback_is_clean_and_topic_focused(self):
+        question = "Tanzimat ve Islahat fermanlarının farkları nelerdir?"
+        sources = [
+            source(
+                "tanzimat-summary",
+                "Çırağan Olayı II. Abdülhamid’e karşıdır. "
+                "Tanzimat Dönemi 1839-1876 arasındadır. "
+                "Tanzimat Dönemi padişahları Abdülmecid, Abdülaziz ve "
+                "V. Murat’tır. Tanzimat Fermanı’nda Mustafa Reşit Paşa "
+                "etkilidir.",
+            ),
+            source(
+                "islahat-rights",
+                "İl genel meclislerine katılabilecek Yeni okul ve ibadethane "
+                "açabilecek Kritik eşleştirme Azınlıklara en geniş haklar → "
+                "Islahat Fermanı 118. CİZYE VERGİSİNİN KALDIRILMASIYLA "
+                "İLİŞKİ",
+            ),
+            source(
+                "tanzimat-reasons",
+                "Tanzimat Fermanı → Mustafa Reşit Paşa 111. TANZİMAT "
+                "FERMANI’NIN İLAN NEDENLERİ Başlıca nedenler: Azınlık "
+                "isyanlarını önlemek Avrupa devletlerinin iç işlerine "
+                "karışmasını engellemek",
+            ),
+            source(
+                "islahat-summary",
+                "115. ISLAHAT FERMANI Islahat Fermanı: Abdülmecid "
+                "Dönemi’nde ilan edilmiştir. Hazırlanmasında etkili "
+                "olanlar: Âli Paşa",
+            ),
+        ]
+        abstention = {
+            "role": "assistant",
+            "content": json.dumps({
+                "answer": "",
+                "source_ids": [],
+                "insufficient_evidence": True,
+            }),
+        }
+        result, _ = self.run_question(
+            question,
+            sources=sources,
+            responses=[abstention],
+        )
+
+        self.assertEqual(result["outcome"], "answered")
+        self.assertEqual(
+            result["answer_method"],
+            "comparison_evidence_excerpt",
+        )
+        self.assertIn("Karşılaştırma:\nTanzimat:", result["answer"])
+        self.assertIn("\nIslahat:", result["answer"])
+        self.assertIn("Azınlık isyanlarını önlemek;", result["answer"])
+        self.assertIn("Azınlıklara en geniş haklar", result["answer"])
+        self.assertIn("Abdülmecid Dönemi’nde ilan edilmiştir", result["answer"])
+        for leaked in (
+            "Çırağan Olayı",
+            "1839-1876",
+            "İl genel meclislerine",
+            "Kritik eşleştirme",
+            "111.",
+            "115.",
+            "118.",
+            "CİZYE VERGİSİNİN KALDIRILMASIYLA İLİŞKİ",
+        ):
+            with self.subTest(leaked=leaked):
+                self.assertNotIn(leaked, result["answer"])
+
     def test_category_lists_are_not_vegetation_evidence(self):
         for catalog in (
             "İklim: Karadeniz, Akdeniz, karasal. Bitki örtüsü: orman, maki, bozkır, çayır.",

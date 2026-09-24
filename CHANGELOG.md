@@ -4,6 +4,12 @@ Yalnızca gerçekten yapılan değişiklikler kaydedilir. Planlanan özellikler 
 
 ## Unreleased
 
+### Temiz ve konu odaklı karşılaştırma geri dönüşü — 2026-09-24
+
+- Yerel modelin cevabı kaynak denetiminden geçmediğinde genel karşılaştırma artık uzun PDF/OCR bloklarını kullanıcıya dökmez; her karşılaştırma tarafı ayrı başlık altında, yalnızca konuya bağlı doğrulanmış maddelerle gösterilir.
+- Numaralı ve büyük harfli bölüm başlıkları, Kritik eşleştirme / Tuzak etiketleri, komşu konu cümleleri ve tekrarlanan kısa kanıtlar ayıklanır. Ok yönlü not ilişkileri okunabilir konu: bilgi biçimine dönüştürülür.
+- Kullanıcının paylaştığı dört Tanzimat–Islahat kaynak bloğu birebir regresyon testine eklendi. 223 Python testi, 19 JavaScript arayüz mantığı testi ve sözdizimi kontrolleri başarılıdır.
+
 ### Dönem–ilan ilişkisi ve kaynak metni temizliği — 2026-09-24
 
 - Kaynaktaki `Tanzimat Dönemi 1839-1876` aralığının `Tanzimat Fermanı 1839-1876 arasında ilan edildi` biçiminde yanlış bir olay ilişkisine dönüştürülmesi artık cevap yayımlanmadan reddedilir.

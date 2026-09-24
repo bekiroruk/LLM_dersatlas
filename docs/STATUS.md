@@ -29,6 +29,7 @@ Ders materyalleri, yerel ortam ayarları, veritabanı ve vektör indeksleri akta
 - Giriş, sohbet, kaynak defteri, doküman ve sistem ekranları modern ve ortak bir tasarım sistemiyle yenilendi. Soru önerileri, canlı karakter sayacı, klavye kısayolu, işlem durumu, kaynak sayısı ve uyarlanabilir mobil yerleşim eklendi; çevrimdışı çalışma korunuyor.
 - Ortak isimli genel karşılaştırmalar (`Tanzimat ve Islahat fermanları` gibi) iki tarafa ayrılarak aranır. Ayrı sayfalardaki kanıtlar dengeli bağlama alınır; model çekimser kalırsa doğrulanmış kaynak satırları gösterilir, tek taraf eksikse sistem cevap uydurmaz.
 - `relation-guard-v20`, dönem aralığını bir fermanın ilan aralığına dönüştüren ilişki hatasını ve PDF bölüm başlığı/meta metnini cevap olarak gösterme kusurunu yayın öncesi reddeder.
+- `clean-comparison-v21`, reddedilen model cevabından sonra ham PDF bloğu göstermek yerine her karşılaştırma tarafı için temiz ve konu odaklı kaynak maddeleri üretir; bölüm numarası, çalışma etiketi, komşu konu ve tekrarlar kullanıcı cevabına taşınmaz.
 
 ## Doğrulama
 
@@ -76,6 +77,12 @@ ilan edilmiştir` ve `ilgili kaynaklarda ... gibi detaylar` çıktısı birebir 
 edildi; dönem–olay ilişkisi ile kaynak başlığı/meta dili artık cevap yayımlanmadan
 reddedilir ve doğrulanmış karşılaştırma satırlarına güvenli dönüş yapılır.
 
+`clean-comparison-v21` doğrulamasında 223 Python ve 19 DOM mantık testi
+başarılıdır. Kullanıcının gerçek Tanzimat–Islahat geri dönüşündeki dört ham
+PDF bloğu birebir işlendi; Çırağan Olayı, dönem aralığı, numaralı bölüm
+başlıkları ve çalışma etiketleri çıkarılırken iki fermana ait doğrulanmış
+bilgilerin ayrı ve okunabilir maddeler olarak korunması test edildi.
+
 ## Bilinen sınırlamalar
 
 - Hafıza sayfa yenilenince silinir; kalıcı sohbet geçmişi yoktur.
@@ -87,6 +94,6 @@ reddedilir ve doğrulanmış karşılaştırma satırlarına güvenli dönüş y
 
 ## Sıradaki adım
 
-Windows kurulumunda güncel kodu çekip uygulamayı başlatmak; bildirilen Tanzimat–
-Islahat karşılaştırmasını gerçek PDF'ler ve yerel Qwen modeliyle yeniden sormak.
+Windows kurulumunda güncel kodu çekip uygulamayı başlatmak; temiz karşılaştırma
+geri dönüşünü gerçek PDF'ler ve yerel Qwen modeliyle yeniden sormak.
 Yeni proje ZIP'i, doküman yükleme veya yeniden indeksleme gerekli değil.
