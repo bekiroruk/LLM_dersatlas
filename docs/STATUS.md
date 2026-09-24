@@ -31,6 +31,7 @@ Ders materyalleri, yerel ortam ayarları, veritabanı ve vektör indeksleri akta
 - `relation-guard-v20`, dönem aralığını bir fermanın ilan aralığına dönüştüren ilişki hatasını ve PDF bölüm başlığı/meta metnini cevap olarak gösterme kusurunu yayın öncesi reddeder.
 - `clean-comparison-v21`, reddedilen model cevabından sonra ham PDF bloğu göstermek yerine her karşılaştırma tarafı için temiz ve konu odaklı kaynak maddeleri üretir; bölüm numarası, çalışma etiketi, komşu konu ve tekrarlar kullanıcı cevabına taşınmaz.
 - `subject-relation-v22`, fermanın kendisini açık özne yapan sayfaları dönem sınırı sayfalarından önce seçer; “X ile benzer” yapısındaki referans tarafını özgün özellik sanmaz ve ortak amaçları tek tarafa yüklemez.
+- `claim-relation-v23`, kişinin yalnızca “etkili” olmasını “tarafından ilan edildi” ilişkisine dönüştürmeyi ve dönem bitişini fermanın süresi gibi göstermeyi reddeder; `ve` ile bağlanan bağımsız iddialar ayrı ayrı kaynak doğrulamasından geçer.
 
 ## Doğrulama
 

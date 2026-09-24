@@ -288,6 +288,66 @@ class RagContractTests(unittest.TestCase):
             for item in result["trace"]
         ))
 
+    def test_duration_agent_and_conjoined_inventions_are_rejected(self):
+        question = "Tanzimat ve Islahat fermanlarının farkları nelerdir?"
+        sources = [
+            source(
+                "period",
+                "Tanzimat Dönemi 1839 Tanzimat Fermanı'nın ilanından "
+                "1876 I. Meşrutiyet'in ilanına kadar geçen süreçtir.",
+            ),
+            source(
+                "tanzimat",
+                "Tanzimat Fermanı'nda Mustafa Reşit Paşa etkilidir. "
+                "Tanzimat Fermanı'nın ilan nedenleri azınlık isyanlarını "
+                "önlemek ve Avrupa devletlerinin iç işlerine karışmasını "
+                "engellemektir.",
+            ),
+            source(
+                "constitutional",
+                "Tanzimat Fermanı Osmanlı Devleti'nde anayasallaşma "
+                "sürecini başlatmıştır.",
+            ),
+            source(
+                "rights",
+                "Islahat Fermanı ile gayrimüslimlere geniş haklar "
+                "verilmiştir. Azınlıklar devlet memuru ve asker "
+                "olabilecek, her tür okula gidebilecektir.",
+            ),
+            source(
+                "islahat",
+                "Islahat Fermanı Abdülmecid Dönemi'nde ilan edilmiştir. "
+                "Hazırlanmasında Âli Paşa ve Fuat Paşa etkili olmuştur.",
+            ),
+        ]
+        invalid = (
+            "Tanzimat Fermanı 1839 yılında ilan edilmiştir ve 1876 yılına "
+            "kadar devam eden süreçte, Mustafa Reşit Paşa tarafından ilan "
+            "edilmiştir. Bu fermanın amacı, azınlık isyanlarını önlemek ve "
+            "Avrupa devletlerinin iç işlerine karışmasını engellemekti. "
+            "İslahat Fermanı ile gayrimüslimlere geniş haklar verilmiştir "
+            "ve Müslümanlarla gayrimüslimler arasındaki eşitlik artırılmaya "
+            "çalışılmıştır. [K1] [K2] [K3] [K4]"
+        )
+        result, _ = self.run_question(
+            question,
+            sources=sources,
+            responses=[payload(invalid, ["K1", "K2", "K3", "K4"])],
+        )
+
+        self.assertEqual(result["outcome"], "answered")
+        self.assertEqual(
+            result["answer_method"],
+            "comparison_evidence_excerpt",
+        )
+        self.assertNotIn("1876 yılına kadar devam", result["answer"])
+        self.assertNotIn("tarafından ilan", result["answer"])
+        self.assertNotIn("eşitlik artırılmaya", result["answer"])
+        self.assertTrue(any(
+            item["tool"] == "unsupported_claim_rejected"
+            for item in result["trace"]
+        ))
+
     def test_reported_comparison_fallback_is_clean_and_topic_focused(self):
         question = "Tanzimat ve Islahat fermanlarının farkları nelerdir?"
         sources = [

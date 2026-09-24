@@ -23,6 +23,9 @@ from app.rag import (
     _generic_comparison_evidence,
     _answer_has_source_support,
     _range_claims_supported,
+    _duration_claims_supported,
+    _agency_claims_supported,
+    _answer_claim_units,
     _contains_source_meta_claim,
 )
 from pypdf import PdfWriter
@@ -195,6 +198,44 @@ class CoreTests(unittest.TestCase):
                 [source],
             )
         )
+
+    def test_period_end_cannot_become_edict_duration(self):
+        period = (
+            "Tanzimat Dönemi 1839 Tanzimat Fermanı'nın ilanından "
+            "1876 I. Meşrutiyet'in ilanına kadar geçen süreçtir."
+        )
+        claim = (
+            "Tanzimat Fermanı 1839 yılında ilan edilmiştir ve 1876 "
+            "yılına kadar devam etmiştir."
+        )
+        self.assertFalse(_duration_claims_supported(claim, [period]))
+        self.assertTrue(_duration_claims_supported(
+            claim,
+            ["Tanzimat Fermanı 1876 yılına kadar devam etmiştir."],
+        ))
+
+    def test_influential_person_cannot_become_announcing_agent(self):
+        claim = "Tanzimat Fermanı Mustafa Reşit Paşa tarafından ilan edildi."
+        self.assertFalse(_agency_claims_supported(
+            claim,
+            [
+                "Tanzimat Fermanı'nda Mustafa Reşit Paşa etkilidir. "
+                "Tanzimat Fermanı 1839 yılında ilan edildi."
+            ],
+        ))
+        self.assertTrue(_agency_claims_supported(
+            claim,
+            ["Tanzimat Fermanı Mustafa Reşit Paşa tarafından ilan edildi."],
+        ))
+
+    def test_conjoined_independent_claims_are_checked_separately(self):
+        units = _answer_claim_units(
+            "Islahat Fermanı ile gayrimüslimlere geniş haklar verilmiştir "
+            "ve Müslümanlarla gayrimüslimler arasındaki eşitlik artırılmıştır."
+        )
+        self.assertEqual(len(units), 2)
+        self.assertIn("geniş haklar", units[0])
+        self.assertIn("eşitlik", units[1])
 
     def test_source_heading_and_meta_language_are_not_answer_claims(self):
         self.assertTrue(

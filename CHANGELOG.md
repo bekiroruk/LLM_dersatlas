@@ -4,6 +4,12 @@ Yalnızca gerçekten yapılan değişiklikler kaydedilir. Planlanan özellikler 
 
 ## Unreleased
 
+### Kişi, süre ve bağlı iddia doğrulaması — 2026-09-24
+
+- Kaynakta yalnızca “etkili” olarak geçen kişi artık fermanı “ilan eden” veya “hazırlayan” kişi gibi sunulamaz; kişi–eylem ilişkisi aynı kaynak biriminde açıkça bulunmalıdır.
+- Tanzimat Dönemi'nin 1876'ya kadar sürmesi, Tanzimat Fermanı'nın 1876'ya kadar devam ettiği biçiminde kullanılamaz. `ve` ile bağlanan iki bağımsız iddia tek cümlenin genel sözcük benzerliğine saklanmadan ayrı ayrı denetlenir.
+- Kullanıcının paylaştığı gerçek hatalı Tanzimat–Islahat cevabı birebir regresyon testine eklendi. 228 Python testi ve 19 JavaScript arayüz mantığı testi başarılıdır.
+
 ### Ferman–dönem ve karşılaştırma öznesi ayrımı — 2026-09-24
 
 - Ferman karşılaştırmalarında konu adı cümlenin başında açık özne olan kanıtlar önceliklendirildi; Tanzimat Dönemi’nin 1839–1876 sınırı artık Tanzimat Fermanı’nın ayırt edici özelliği yerine seçilmez.
