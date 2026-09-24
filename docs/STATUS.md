@@ -30,6 +30,7 @@ Ders materyalleri, yerel ortam ayarları, veritabanı ve vektör indeksleri akta
 - Ortak isimli genel karşılaştırmalar (`Tanzimat ve Islahat fermanları` gibi) iki tarafa ayrılarak aranır. Ayrı sayfalardaki kanıtlar dengeli bağlama alınır; model çekimser kalırsa doğrulanmış kaynak satırları gösterilir, tek taraf eksikse sistem cevap uydurmaz.
 - `relation-guard-v20`, dönem aralığını bir fermanın ilan aralığına dönüştüren ilişki hatasını ve PDF bölüm başlığı/meta metnini cevap olarak gösterme kusurunu yayın öncesi reddeder.
 - `clean-comparison-v21`, reddedilen model cevabından sonra ham PDF bloğu göstermek yerine her karşılaştırma tarafı için temiz ve konu odaklı kaynak maddeleri üretir; bölüm numarası, çalışma etiketi, komşu konu ve tekrarlar kullanıcı cevabına taşınmaz.
+- `subject-relation-v22`, fermanın kendisini açık özne yapan sayfaları dönem sınırı sayfalarından önce seçer; “X ile benzer” yapısındaki referans tarafını özgün özellik sanmaz ve ortak amaçları tek tarafa yüklemez.
 
 ## Doğrulama
 
@@ -82,6 +83,12 @@ başarılıdır. Kullanıcının gerçek Tanzimat–Islahat geri dönüşündeki
 PDF bloğu birebir işlendi; Çırağan Olayı, dönem aralığı, numaralı bölüm
 başlıkları ve çalışma etiketleri çıkarılırken iki fermana ait doğrulanmış
 bilgilerin ayrı ve okunabilir maddeler olarak korunması test edildi.
+
+`subject-relation-v22` doğrulamasında 224 Python ve 19 DOM mantık testi
+başarılıdır. Gerçek üç kaynaklı Tanzimat–Islahat cevabı regresyona alındı;
+dönem sınırı sayfasının elenmesi, Tanzimat Fermanı'nın doğrudan neden/etki
+sayfalarının seçilmesi ve “benzer amaçlar” cümlesinin Tanzimat'a özgü fark
+olarak kullanılmaması doğrulandı.
 
 ## Bilinen sınırlamalar
 

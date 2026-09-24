@@ -357,6 +357,61 @@ class RagContractTests(unittest.TestCase):
             with self.subTest(leaked=leaked):
                 self.assertNotIn(leaked, result["answer"])
 
+    def test_ferman_comparison_prefers_ferman_facts_over_period_boundary(self):
+        question = "Tanzimat ve Islahat fermanlarının farkları nelerdir?"
+        sources = [
+            source(
+                "period",
+                "Tanzimat Dönemi: 1839 Tanzimat Fermanı’nın ilanından "
+                "1876 I. Meşrutiyet’in ilanına kadar geçen süreçtir.",
+            ),
+            source(
+                "tanzimat",
+                "Tanzimat Fermanı → Mustafa Reşit Paşa 111. TANZİMAT "
+                "FERMANI’NIN İLAN NEDENLERİ Başlıca nedenler: Azınlık "
+                "isyanlarını önlemek Avrupa devletlerinin iç işlerine "
+                "karışmasını engellemek",
+            ),
+            source(
+                "shared",
+                "Tanzimat Fermanı: Osmanlı Devleti’nde anayasallaşma "
+                "sürecini başlatmıştır. Islahat Fermanı: Abdülmecid "
+                "Dönemi’nde ilan edilmiştir. Hazırlanmasında etkili "
+                "olanlar: Âli Paşa Fuat Paşa. Tanzimat Fermanı’yla "
+                "benzer amaçlar taşır: Azınlık isyanlarını önlemek "
+                "Avrupa müdahalesini azaltmak Osmanlı Devleti’nin "
+                "dağılmasını önlemek Azınlıkları devlete bağlamak",
+            ),
+            source(
+                "islahat",
+                "Islahat Fermanı’yla: Gayrimüslimlere çok geniş haklar "
+                "verilmiştir. Azınlıklar: Devlet memuru olabilecek Asker "
+                "olabilecek Her tür okula gidebilecek",
+            ),
+        ]
+        abstention = {
+            "role": "assistant",
+            "content": json.dumps({
+                "answer": "",
+                "source_ids": [],
+                "insufficient_evidence": True,
+            }),
+        }
+        result, model = self.run_question(
+            question,
+            sources=sources,
+            responses=[abstention],
+        )
+
+        context = "\n".join(item["text"] for item in self.context(model))
+        self.assertNotIn("1839 Tanzimat Fermanı’nın ilanından", context)
+        self.assertNotIn("benzer amaçlar taşır", context)
+        self.assertIn("Tanzimat Fermanı: Mustafa Reşit Paşa", context)
+        self.assertIn("anayasallaşma sürecini başlatmıştır", context)
+        self.assertIn("Gayrimüslimlere çok geniş haklar", context)
+        self.assertEqual(result["outcome"], "answered")
+        self.assertNotIn("1839 Tanzimat Fermanı’nın ilanından", result["answer"])
+
     def test_category_lists_are_not_vegetation_evidence(self):
         for catalog in (
             "İklim: Karadeniz, Akdeniz, karasal. Bitki örtüsü: orman, maki, bozkır, çayır.",

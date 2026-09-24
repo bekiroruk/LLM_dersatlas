@@ -4,6 +4,12 @@ Yalnızca gerçekten yapılan değişiklikler kaydedilir. Planlanan özellikler 
 
 ## Unreleased
 
+### Ferman–dönem ve karşılaştırma öznesi ayrımı — 2026-09-24
+
+- Ferman karşılaştırmalarında konu adı cümlenin başında açık özne olan kanıtlar önceliklendirildi; Tanzimat Dönemi’nin 1839–1876 sınırı artık Tanzimat Fermanı’nın ayırt edici özelliği yerine seçilmez.
+- “Tanzimat Fermanı’yla benzer amaçlar taşır” gibi bir tarafı yalnızca karşılaştırma referansı yapan cümleler o tarafa özgü kanıt sayılmaz. Ortak amaçların tek bir fermana ait fark gibi sunulması istem ve kaynak bağlamı düzeyinde engellendi.
+- Kullanıcının gerçek üç kaynaklı cevabı dönem sayfası, ortak amaç cümlesi ve iki fermana özgü sayfalarla regresyon testine dönüştürüldü. 224 Python testi ve 19 JavaScript arayüz mantığı testi başarılıdır.
+
 ### Temiz ve konu odaklı karşılaştırma geri dönüşü — 2026-09-24
 
 - Yerel modelin cevabı kaynak denetiminden geçmediğinde genel karşılaştırma artık uzun PDF/OCR bloklarını kullanıcıya dökmez; her karşılaştırma tarafı ayrı başlık altında, yalnızca konuya bağlı doğrulanmış maddelerle gösterilir.
